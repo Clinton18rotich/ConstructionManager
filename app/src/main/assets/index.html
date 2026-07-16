@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Construction Manager</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#0a0a0a;color:#fff}
+.header{background:#1a1a1a;padding:12px;text-align:center;border-bottom:2px solid #ff9f0a;position:sticky;top:0;z-index:100}
+.header h1{color:#ff9f0a;font-size:18px}
+.nav{display:flex;overflow-x:auto;background:#1c1c1e;gap:4px;padding:8px;position:sticky;top:56px;z-index:99}
+.nav button{flex:0 0 auto;background:#2c2c2e;color:#fff;border:none;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;font-size:12px}
+.nav button.active{background:#ff9f0a;color:#000;font-weight:bold}
+.content{padding:15px;max-width:900px;margin:0 auto;padding-bottom:100px}
+label{display:block;margin:10px 0 3px;color:#aaa;font-size:12px;font-weight:bold}
+input,select,textarea{width:100%;padding:10px;background:#1c1c1e;border:1px solid #333;color:#fff;border-radius:8px;font-size:14px;margin-bottom:5px}
+textarea{min-height:70px;resize:vertical}
+.btn{background:#ff9f0a;color:#000;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer;margin:8px 4px 8px 0;font-size:13px}
+.btn-blue{background:#0a84ff;color:#fff}
+.btn-red{background:#ff3b30;color:#fff}
+.btn-green{background:#30d158;color:#000}
+.btn-sm{padding:6px 12px;font-size:11px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
+th,td{border:1px solid #333;padding:5px;text-align:left;vertical-align:top}
+th{background:#1c1c1e;color:#ff9f0a;font-size:11px}
+.card{background:#1c1c1e;border-radius:10px;padding:12px;margin:8px 0;border:1px solid #333}
+.card h4{margin-bottom:8px;color:#ff9f0a}
+.tag{display:inline-block;padding:3px 8px;border-radius:10px;font-size:10px;margin:2px}
+.tag-pass{background:#30d158;color:#000}
+.tag-fail{background:#ff3b30;color:#fff}
+.tag-open{background:#ff9f0a;color:#000}
+.tag-closed{background:#30d158;color:#000}
+.report-preview{background:#fff;color:#000;padding:20px;border-radius:8px;font-family:monospace;font-size:11px;line-height:1.5}
+.report-preview h3{text-align:center;text-transform:uppercase;font-size:13px}
+.report-preview h4{font-size:12px;margin-top:10px}
+.report-preview hr{border:1px solid #000}
+.report-preview table{border:1px solid #000;font-size:10px}
+.report-preview td,.report-preview th{border:1px solid #000;color:#000;padding:3px}
+.report-preview th{background:#ddd}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ff9f0a;color:#000;padding:10px 20px;border-radius:20px;font-weight:bold;display:none;z-index:1000}
+@media print{body{background:#fff;color:#000}.header,.nav,.btn,.toast{display:none}.content{padding:0}.report-preview{border-radius:0}}
+.hamburger{position:absolute;left:10px;top:10px;font-size:24px;cursor:pointer;color:#ff9f0a;z-index:101;background:none;border:none}.sidebar{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#111;z-index:200;transition:left 0.3s;overflow-y:auto;padding:60px 15px 20px;box-shadow:2px 0 10px rgba(0,0,0,0.5)}.sidebar.open{left:0}.sidebar button{display:block;width:100%;text-align:left;padding:12px;background:none;color:#fff;border:none;font-size:13px;cursor:pointer;border-radius:8px;margin:2px 0}.sidebar button.active{background:#ff9f0a;color:#000;font-weight:bold}.sidebar button:hover{background:#333}.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:199;display:none}.overlay.show{display:block}.header{position:relative;text-align:center}
+</style>
+</head>
+<body>
+<div class="header"><button class="hamburger" onclick="toggleMenu()">☰</button><h1>CONSTRUCTION MANAGER</h1><div style="margin-top:5px"><input type="date" id="globalDatePicker" onchange="setGlobalDate(this.value)" style="width:auto;display:inline-block;font-size:12px;text-align:center;background:#333;color:#ff9f0a;border:1px solid #ff9f0a;border-radius:6px;padding:4px 8px"> <small style="color:#aaa" id="globalDateLabel"></small></div></div>
+<div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+<div class="sidebar" id="sidebar"></div>
+<div class="nav" id="nav" style="display:none"></div>
+<div class="content" id="content"></div>
+<div class="toast" id="toast"></div>
+<script>
+// ============ CORE ============
+var K="cm_v5";
+var D=JSON.parse(localStorage.getItem(K))||getDefault();
+if(!D.stock)D.stock=[];if(!D.materialLogs)D.materialLogs=[];
+function rebuildStock(){
+D.stock=[];var logs=D.materialLogs||[];
+for(var i=0;i<logs.length;i++){var l=logs[i];var f=false;
+for(var j=0;j<D.stock.length;j++){if(D.stock[j].name===l.name&&D.stock[j].unit===l.unit){D.stock[j].qty+=(l.type==="delivery"?parseFloat(l.qty):-parseFloat(l.qty));f=true;break;}}
+if(!f){D.stock.push({id:uid(),name:l.name,category:l.category||"",qty:l.type==="delivery"?parseFloat(l.qty):-parseFloat(l.qty),unit:l.unit||"",minStock:10,date:l.date});}}
+save();}
+rebuildStock();
+function getDefault(){return {reportNo:"",date:new Date().toISOString().split("T")[0],projectName:"",wpItemNo:"",contractNo:"",siteLocation:"",county:"",mainContractor:"",weatherMorning:"",weatherAfternoon:"",groundCondition:"",tempNotes:"",diaries:[],inspections:[],ncrs:[],instructions:[],materials:[],materialLogs:[],stock:[],concreteCubes:[],drawings:[],rfis:[],stopWorkOrders:[],materialRejections:[],labour:[],plant:[],meetings:[],delays:[],cowName:"",cowDateTime:"",contractorRepName:"",contractorRepDateTime:""};}
+function save(){localStorage.setItem(K,JSON.stringify(D));}
+function toast(m){var t=document.getElementById("toast");t.textContent=m;t.style.display="block";setTimeout(function(){t.style.display="none";},2000);}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
+function today(){return new Date().toISOString().split("T")[0];}
+var globalDate=today();
+function setGlobalDate(d){globalDate=d;go(current);}
+function fmtGlobalDate(){return new Date(globalDate).toLocaleDateString("en-KE",{weekday:"short",day:"numeric",month:"short",year:"numeric"});}
+function addItem(arr,item){if(!D[arr])D[arr]=[];D[arr].push(item);save();}
+function delItem(arr,id){D[arr]=D[arr].filter(function(i){return i.id!==id;});save();}
+
+// ============ CATALOGS ============
+var WORK_ITEMS=["Mobilization - Site Setup","Mobilization - Hoarding","Setting Out - Control Points","Setting Out - Grid Lines","Bulk Excavation","Trench Excavation","Backfill & Compaction","Hardcore Filling","Murram Blinding","Blinding - 50mm","DPM Installation","Foundation Reinforcement","Foundation Concreting","Column Starter Bars","Ground Beam Formwork","Ground Beam Reinforcement","Ground Beam Concreting","GFS - Hardcore","GFS - DPM","GFS - Blinding","GFS - BRC","GFS - Formwork","GFS - Concreting","Anti-Termite Treatment","Substructure Backfill","Column Reinf - GF","Column Shutters - GF","Column Concreting - GF","Beam Formwork - GF","Beam Reinf - GF","Beam Concreting - GF","Slab Formwork - GF","Slab Reinf - GF","Slab Concreting - GF","Blockwork - GF","Blockwork - 1F","Hoop Iron Installation","Ring Beam","Lintels","Steel Fabrication","Steel Erection","Roof Structure","Roof Underlay","Tile Roofing","Sheet Roofing","Flashings","Gutters","Waterproofing","Drainage","Plumbing","Electrical Cabling","Plastering","Rendering","Floor Screeding","Floor Tiling","Wall Tiling","Painting","Doors","Windows","Glazing","Ceiling","Paving","Landscaping","Septic Tank","Commissioning","Snagging","Cleaning","Handover"];
+var OBSERVATIONS=["Work progressing well","Good quality workmanship","Materials as per specification","Weather favourable, good productivity","Safety measures in place","Work slightly behind schedule","Quality issues noted","Material shortage reported","Equipment breakdown","Labour shortage","Work stopped due to rain","Rain affected concreting","Work stopped - safety concern","Defective work rejected - NCR raised","Materials rejected","Inspection carried out","Site meeting held","Engineers instruction received","Concrete delivery received","Steel delivery received","Formwork being erected","Reinforcement being tied","Curing ongoing","Site cleaning in progress"];
+var SITE_LOCATIONS=["Site Wide / General","Block A - Ground Floor","Block A - First Floor","Block B - Ground Floor","Block B - First Floor","Block C - Ground Floor","Main Entrance / Gate","Perimeter Wall","Parking Area","Driveway / Access Road","Excavation Area","Foundation / Substructure","Superstructure - Columns","Superstructure - Beams","Superstructure - Slabs","Staircase","Lift Shaft","Roof Level","External Works - Paving","External Works - Drainage","Site Office","Material Storage Area","Workshop / Yard","Guard House","Water Tank / Tower","Septic Tank Area"];
+var NCR_CATEGORIES={"Excavation":["Too deep/shallow","Wrong trench width","Unsafe batter","Poor compaction"],"Substructure":["Blinding thin/uneven","DPM punctured","Wrong rebar","Insufficient cover","Honeycomb"],"Concrete Frame":["Honeycomb","Wrong grade","Insufficient vibration","Formwork not plumb","Cold joint"],"Blockwork":["Wrong block type","Poor bonding","Mortar mix wrong","Hoop iron missing"],"Finishes":["Plaster cracking","Uneven rendering","Wrong paint","Tiles not level"],"General":["Work not to drawing","Unsafe practice","Poor housekeeping"]};
+var DELAY_CATEGORIES={"Weather":["Heavy rain","Flooding","High winds"],"Material Supply":["Late steel","Late cement","Material shortage"],"Labour":["Shortage","Strike","Key person absent"],"Equipment":["Crane breakdown","Pump failure","Generator failure"],"Design/Client":["Late design change","Delayed approval","Client variation"],"Contractual":["Delayed payment","Dispute"],"Other":["Utility relocation","Community unrest"]};
+var MATERIAL_CATALOG={
+"Cement & Binders":["Cement - OPC 42.5N (Bamburi)","Cement - OPC 42.5N (Simba)","Cement - OPC 42.5N (Blue Triangle)","Cement - PPC 32.5N (Bamburi)","Cement - PPC 32.5N (Simba)","Cement - PPC 32.5N (Blue Triangle)","Cement - CEM IV 32.5N (Pozzolanic)","White Cement 25kg","Lime - Hydrated 25kg","Gypsum 25kg","Grout - Non-shrink 25kg","Bonding Agent SBR 5L","Cement Waterproofing Admixture"],
+"Reinforcement Steel":["R6 (6mm) - 12m bars","R8 (8mm) - 12m bars","Y8 (8mm) - 12m bars","Y10 (10mm) - 12m bars","Y12 (12mm) - 12m bars","Y16 (16mm) - 12m bars","Y20 (20mm) - 12m bars","Y25 (25mm) - 12m bars","Y32 (32mm) - 12m bars","BRC Mesh A65 (2.4x4.8m)","BRC Mesh A98 (2.4x4.8m)","BRC Mesh A142 (2.4x4.8m)","BRC Mesh A193 (2.4x4.8m)","BRC Mesh A252 (2.4x4.8m)","Binding Wire 1.6mm (25kg roll)","Hoop Iron 25mm x 1.6mm","Hoop Iron 30mm x 1.6mm","Spacers - Cover Blocks 20mm","Spacers - Cover Blocks 25mm","Spacers - Cover Blocks 40mm","Spacers - Cover Blocks 50mm","Reinforcement Chairs - 75mm","Reinforcement Chairs - 100mm","Reinforcement Chairs - 125mm"],
+"Concrete Blocks":["Solid Block 4in (100mm)","Solid Block 6in (150mm)","Solid Block 8in (200mm)","Solid Block 9in (225mm)","Hollow Block 4in","Hollow Block 6in","Hollow Block 8in","Interlocking Block 6in","Interlocking Block 8in","Partition Block 3in (75mm)","Lintel Block 6in","Lintel Block 8in","Cavity Block 6in","Quoin Block (Corner) 6in","Half Block 6in"],"Bricks & Clay Products":["Machine Cut Bricks 225x110x75mm","Machine Cut Bricks 225x110x65mm","Hand Made Bricks","Clay Bricks Facing","Clay Bricks Common","Maxpans/Clay Tiles 300x300mm","Clay Ridge Tiles","Clay Half Round Tiles","Decorative Clay Blocks","Clay Ventilator Blocks","Clay Hollow Pots Floor","Clay Hollow Pots Roof","Terracotta Floor Tiles"],
+"Aggregates & Sand":["River Sand (Fine) - per ton","River Sand (Coarse) - per ton","Plaster Sand - per ton","M-Sand (Crushed) - per ton","Ballast 10mm - per ton","Ballast 14mm - per ton","Ballast 20mm - per ton","Ballast 25mm - per ton","Hardcore 50-75mm - per ton","Hardcore 100-150mm - per ton","Hardcore 150-200mm - per ton","Murram - Red - per ton","Quarry Dust - per ton","Graded Gravel - per ton","Stone Dust - per ton"],
+"Timber & Formwork Lumber":["Timber 2x1 (50x25mm)","Timber 3x1 (75x25mm)","Timber 4x1 (100x25mm)","Timber 6x1 (150x25mm)","Timber 8x1 (200x25mm)","Timber 2x2 (50x50mm)","Timber 3x2 (75x50mm)","Timber 4x2 (100x50mm)","Timber 6x2 (150x50mm)","Timber 8x2 (200x50mm)","Timber 3x3 (75x75mm)","Timber 4x3 (100x75mm)","Timber 4x4 (100x100mm)","Timber 6x6 (150x150mm)","Props Pine 75mm x 2m","Props Pine 75mm x 3m","Props Pine 100mm x 3m","Props Pine 100mm x 4m","Props Eucalyptus 100mm x 3m","Plywood 6mm","Plywood 9mm","Plywood 12mm","Plywood 18mm (shuttering)","Plywood 25mm","Blockboard 18mm","MDF Board 9mm","MDF Board 12mm","MDF Board 18mm","Chipboard 16mm","Timber Trusses Treated","Fascia Board 6x1","Fascia Board 8x1","Batten 2x1","Batten 3x1"],
+"Roofing Materials":["Iron Sheets G30 2.0m","Iron Sheets G30 2.5m","Iron Sheets G30 3.0m","Iron Sheets G28 2.5m","Iron Sheets G28 3.0m","Iron Sheets G32 2.5m","Iron Sheets G32 3.0m","Ridge Caps - Iron 2.0m","Ridge Caps - Galvanized 2.0m","Roofing Nails 75mm (3in)","Roofing Nails 100mm (4in)","Gutters UPVC 100mm x 3m","Gutters UPVC 150mm x 3m","Downpipes UPVC 100mm x 3m","Downpipes UPVC 150mm x 3m","Gutter Brackets 100mm","Gutter Brackets 150mm","Gutter Stop Ends","Gutter Union Connectors","Fascia Boards UPVC 6in x 3m","Soffit Boards UPVC 9mm x 3m","Roofing Screws with Washers","Roofing Sealant - Silicone","Roof Ventilators","Ridge Tile - Concrete"],
+"Waterproofing & DPM":["DPM 500 Gauge (4x25m roll)","DPM 1000 Gauge (4x25m roll)","DPM 1200 Gauge (4x25m roll)","DPM 2000 Gauge (4x25m roll)","Torch-on Membrane 3mm (10m roll)","Torch-on Membrane 4mm (10m roll)","Self-Adhesive Membrane 1.5mm","Liquid Waterproofing (20L)","Bituminous Paint Black (20L)","Primer for Membrane (5L)","Bonding Agent SBR (5L)","Waterbar - PVC 150mm x 20m","Waterbar - PVC 200mm x 20m","Waterstop - Hydrophilic Strip 20x10mm","Fillet Sealant - Polyurethane","Expansion Joint Filler 12mm"],
+"Plumbing - Waste/Drainage":["PVC Waste Pipe 32mm x 3m","PVC Waste Pipe 40mm x 3m","PVC Waste Pipe 50mm x 3m","PVC Soil Pipe 110mm x 3m","PVC Soil Pipe 110mm x 6m","PVC Soil Pipe 160mm x 3m","PVC Soil Pipe 160mm x 6m","PVC Elbow 87.5deg 50mm","PVC Elbow 87.5deg 110mm","PVC Elbow 45deg 50mm","PVC Elbow 45deg 110mm","PVC Tee 50mm","PVC Tee 110mm","PVC Tee 110x50mm","PVC Reducer 110x50mm","PVC Coupling 50mm","PVC Coupling 110mm","PVC Access Pipe 110mm","PVC Vent Cowl 50mm","PVC Vent Cowl 110mm","PVC Bottle Gully","PVC Floor Trap 50mm","PVC Hopper Head","PVC P-Trap 50mm","PVC S-Trap 110mm","PVC Pipe Clips 50mm","PVC Pipe Clips 110mm","Solvent Cement 250ml","Solvent Cement 500ml"],
+"Plumbing - Supply/Hot Water":["HDPE Pipe 25mm x 100m roll","HDPE Pipe 32mm x 100m roll","HDPE Pipe 40mm x 100m roll","HDPE Pipe 50mm x 100m roll","HDPE Pipe 63mm x 6m","HDPE Pipe 110mm x 6m","PPR Pipe 20mm x 4m (Cold)","PPR Pipe 25mm x 4m (Cold)","PPR Pipe 32mm x 4m (Cold)","PPR Pipe 20mm x 4m (Hot - Green)","PPR Pipe 25mm x 4m (Hot - Green)","PPR Pipe 32mm x 4m (Hot - Green)","PPR Elbow 90deg 20mm","PPR Elbow 90deg 25mm","PPR Tee 20mm","PPR Tee 25mm","PPR Tee 25x20mm","PPR Coupling 20mm","PPR Coupling 25mm","PPR Reducer 25x20mm","PPR Female Adaptor 20mm x 1/2in","PPR Male Adaptor 20mm x 1/2in","PPR Ball Valve 20mm","PPR Ball Valve 25mm","PPR Pipe Clip 20mm","PPR Pipe Clip 25mm"],
+"Plumbing - Sanitary Ware":["WC - Floor Mounted Close Coupled","WC - Wall Hung","WC - Squat Pan (African)","WC Seat Cover - Soft Close","Basin - Pedestal","Basin - Wall Hung","Basin - Counter Top","Basin Mixer Tap","Urinal - Bowl","Urinal - Slab","Sink - Stainless Steel Single Bowl","Sink - Stainless Steel Double Bowl","Sink Mixer Tap","Shower Head 6in","Shower Mixer Valve","Shower Tray 900x900mm","Bath Tub 1700mm","Bib Tap 15mm","Bib Tap 20mm","Gate Valve 25mm","Gate Valve 50mm","Ball Valve 25mm","Stop Cock 15mm","Stop Cock 20mm","Water Meter 15mm","Water Meter 20mm","Pressure Reducing Valve 25mm","Float Valve 25mm"],
+"Water Storage":["Water Tank 500L (Blue)","Water Tank 1000L (Blue)","Water Tank 2000L (Blue)","Water Tank 5000L (Blue)","Water Tank 500L (Black)","Water Tank 1000L (Black)","Water Tank 2000L (Black)","Water Tank 5000L (Black)","Water Tank 10000L (Black)","Underground Tank 5000L","Underground Tank 10000L","Tank Connector 25mm","Tank Connector 32mm","Tank Overflow Kit","Tank Float Valve 25mm","Booster Pump 0.5HP","Booster Pump 1HP"],
+"Electrical Materials":["Cable 1.5mm2 Twin+Earth (100m)","Cable 2.5mm2 Twin+Earth (100m)","Cable 4mm2 Twin+Earth (100m)","Cable 6mm2 Twin+Earth (100m)","Cable 10mm2 Twin+Earth (100m)","Cable 16mm2 Single Core (100m)","Conduit PVC 20mm x 3m","Conduit PVC 25mm x 3m","Conduit Elbow 20mm","Conduit Elbow 25mm","Conduit Coupling 20mm","Conduit Coupling 25mm","Conduit Tee 20mm","Conduit Saddle 20mm","Trunking PVC 25x16mm x 3m","Trunking PVC 38x25mm x 3m","DB 4-Way SPN Surface","DB 8-Way SPN Surface","DB 12-Way SPN Surface","DB 4-Way SPN Flush","DB 8-Way SPN Flush","MCB 6A Single Pole","MCB 10A Single Pole","MCB 16A Single Pole","MCB 20A Single Pole","MCB 32A Single Pole","MCB 40A Single Pole","MCB 63A Single Pole","RCD 40A 30mA","RCD 63A 30mA","RCD 100A 30mA","Switch 1-Gang 1-Way","Switch 1-Gang 2-Way","Switch 2-Gang 1-Way","Switch 2-Gang 2-Way","Socket 13A Switched Single","Socket 13A Switched Double","Socket 15A Round Pin (Cooker)","LED Bulb 5W","LED Bulb 10W","LED Bulb 18W","LED Floodlight 30W","LED Floodlight 50W","LED Floodlight 100W","Ceiling Rose","Junction Box 20A","Junction Box 30A","Earthing Rod Copper 1.2m","Earthing Rod Copper 1.5m","Earthing Clamp","Earth Wire 10mm2 Green/Yellow"],
+"Paint & Finishes":["Undercoat White (20L)","Vinyl Emulsion White (20L)","Vinyl Emulsion - Cream (20L)","Vinyl Emulsion - Off-white (20L)","Vinyl Emulsion - Grey (20L)","Gloss White (4L)","Gloss - Cream (4L)","Gloss - Grey (4L)","Gloss - Black (4L)","Primer - Wood (4L)","Primer - Metal Red Oxide (4L)","Primer - Metal Zinc Chromate (4L)","Putty - Wall Filler (25kg)","Putty - Wood Filler (1kg)","Sandpaper 80 Grit","Sandpaper 120 Grit","Sandpaper 240 Grit","Sandpaper 400 Grit","Masking Tape 25mm x 50m","Masking Tape 50mm x 50m","Roller 9in with Tray","Roller 4in (Mini)","Brush 1in","Brush 2in","Brush 4in","Thinners - Turpentine (5L)","Thinners - White Spirit (5L)","Varnish Clear Gloss (4L)","Varnish Clear Matt (4L)","Wood Stain - Mahogany (4L)"],
+"Tiles & Adhesives":["Floor Tile 300x300mm","Floor Tile 400x400mm","Floor Tile 500x500mm","Floor Tile 600x600mm","Wall Tile 200x300mm","Wall Tile 250x400mm","Wall Tile 300x600mm","Porcelain Tile 600x600mm Matt","Porcelain Tile 600x600mm Glossy","Porcelain Tile 800x800mm","Wood-look Tile 150x900mm","Wood-look Tile 200x1200mm","Mosaic Tile Sheet 300x300mm","Terrazzo Tile 400x400mm","Quarry Tile 300x300mm","Tile Adhesive Standard (25kg)","Tile Adhesive Flexible (25kg)","Tile Adhesive Rapid Set (25kg)","Grout White (5kg)","Grout Grey (5kg)","Grout Beige (5kg)","Grout Brown (5kg)","Grout Black (5kg)","Tile Spacers 2mm","Tile Spacers 3mm","Tile Spacers 5mm","Tile Levelling System Kit"],
+"Floor Finishes":["Epoxy Floor Paint - Clear (5L)","Epoxy Floor Paint - Grey (5L)","Epoxy Floor Paint - Green (5L)","Epoxy Self-Levelling (25kg)","Epoxy Primer (5L)","Epoxy Hardener (1L)","PVC Floor Tiles 300x300mm","Carpet Tiles 500x500mm","Vinyl Sheet Flooring 2m wide","Vinyl Skirting 75mm x 3m","Screed - Ready Mix (25kg)","Screed - Self-Levelling (25kg)","Terrazzo - Cement Based (25kg)","Floor Hardener - Metallic (25kg)","Floor Hardener - Non-metallic (25kg)"],
+"Doors & Windows":["Flush Door 2100x900x40mm","Flush Door 2100x800x40mm","Panel Door 2100x900x40mm","Panel Door 2100x800x40mm","Fire Door 2100x900x45mm (1hr)","Fire Door 2100x900x45mm (2hr)","Door Frame - Hardwood 100x50mm","Door Frame - Softwood 100x50mm","Door Frame - Metal 100x50mm","Aluminium Sliding Window 1200x1200mm","Aluminium Sliding Window 1500x1200mm","Aluminium Sliding Window 1800x1200mm","Aluminium Casement Window 600x600mm","Aluminium Casement Window 600x900mm","Aluminium Casement Window 900x1200mm","Steel Casement Window 600x900mm","Glass Clear 4mm","Glass Clear 6mm","Glass Clear 10mm","Glass Tinted 5mm (Bronze)","Glass Tinted 5mm (Grey)","Glass Obscured 4mm (Bathroom)","Door Locks - Mortice 2.5in","Door Locks - Mortice 3in","Door Locks - Cylindrical","Door Handles - Lever Aluminium","Door Handles - Lever Stainless","Hinges 3in Stainless Steel","Hinges 4in Stainless Steel","Hinges 4in Brass","Door Closer Overhead","Door Closer Floor Spring","Door Stopper Floor Mounted","Door Stopper Wall Mounted","Door Viewer (Peephole)","Door Chain","Tower Bolt 6in","Tower Bolt 9in","Barrel Bolt 4in","Padlock 40mm","Padlock 50mm","Padlock 60mm","Window Stay - Aluminium 300mm","Window Handle - Aluminium","Window Seal - Rubber (per m)","Silicone Sealant Clear","Silicone Sealant White","Putty - Glazing (5kg)"],
+"Hardware & Ironmongery":["Nails 25mm (1in) - per kg","Nails 40mm (1.5in) - per kg","Nails 50mm (2in) - per kg","Nails 75mm (3in) - per kg","Nails 100mm (4in) - per kg","Nails 125mm (5in) - per kg","Nails 150mm (6in) - per kg","Screws 12mm","Screws 25mm","Screws 40mm","Screws 50mm","Screws 75mm","Screws 100mm","Screws 150mm","Wall Plugs 6mm (100pcs)","Wall Plugs 8mm (100pcs)","Wall Plugs 10mm (100pcs)","Bolts & Nuts M8x50mm","Bolts & Nuts M10x75mm","Bolts & Nuts M12x100mm","Washers M8","Washers M10","Washers M12","Coach Screws 75mm","Coach Screws 100mm","Steel Wool - Coarse","Steel Wool - Fine","Wire Mesh 13mm (Chicken Wire)","Wire Mesh 25mm","Wire Mesh 50mm (Chain Link)"],
+"Tools - Hand":["Claw Hammer 16oz","Claw Hammer 20oz","Club Hammer 2lb","Club Hammer 4lb","Sledge Hammer 7lb","Sledge Hammer 14lb","Hand Saw 500mm (Crosscut)","Hand Saw 600mm (Rip)","Hacksaw Frame 300mm","Hacksaw Blade 12in (18TPI)","Hacksaw Blade 12in (24TPI)","Pliers - Combination 8in","Pliers - Long Nose 8in","Pliers - Water Pump 10in","Pliers - Side Cutters 6in","Panga (Machete) - Curved","Panga (Machete) - Straight","Axe - 2lb","Axe - 4lb","Spade - D-handle","Spade - T-handle","Shovel - Round Point","Shovel - Square Point","Fork Jembe","Jembe (Hoe) - Heavy Duty","Pick Axe 5lb","Mattock / Pick","Wheelbarrow 65L Steel","Wheelbarrow 85L Steel","Trowel - Brick 11in","Trowel - Pointing 6in","Trowel - Plastering Steel 11x5in","Float - Wooden 12x5in","Float - Sponge","Spirit Level 600mm (2ft)","Spirit Level 1200mm (4ft)","Measuring Tape 5m","Measuring Tape 10m","Measuring Tape 30m","Chalk Line & Powder","Plumb Bob 500g","String Line 100m (Nylon)","Crowbar 1.5m","Crowbar 1.8m","Cold Chisel 12in","Bolster Chisel 10in","Wood Chisel Set (6pc)"],
+"Tools - Power & Safety":["Angle Grinder 4.5in","Angle Grinder 9in","Grinding Disc 4.5in (Metal)","Grinding Disc 9in (Metal)","Cutting Disc 4.5in (Metal)","Cutting Disc 4.5in (Stone)","Diamond Blade 4.5in","Diamond Blade 9in","Hammer Drill 13mm","Masonry Drill Bit 6mm","Masonry Drill Bit 8mm","Masonry Drill Bit 10mm","Masonry Drill Bit 12mm","Circular Saw 7.25in","Jigsaw","Router 1/2in","Nail Gun - Pneumatic","Staple Gun Manual","Welding Machine - Arc 200A","Welding Rods 2.5mm (per kg)","Welding Rods 3.15mm (per kg)","Welding Mask - Auto Darkening","Welding Gloves","Safety Helmet (White)","Safety Helmet (Yellow)","Safety Helmet (Blue)","Safety Boots (Gumboots)","Safety Harness - Full Body","Reflective Vest - Yellow","Reflective Vest - Orange","Work Gloves - Leather","Work Gloves - Cotton","Dust Mask N95","Ear Plugs (Disposable)","Safety Goggles Clear","Safety Goggles Tinted"],
+
+"Tools & Site Equipment":["Wheelbarrow 65L Steel","Wheelbarrow 85L Steel","Spade D-handle","Spade T-handle","Shovel Round Point","Shovel Square Point","Fork Jembe","Jembe (Hoe) Heavy Duty","Pick Axe 5lb","Mattock / Pick","Rake - Steel","Crowbar 1.5m","Crowbar 1.8m","Screed Board Aluminium 3m","Concrete Poker 40mm","Concrete Poker 60mm","Mortar Pan Steel","Bucket 20L Plastic","Water Drum 200L","Fuel Jerry Can 20L","Tarpaulin 6x9m","Curing Hessian Cloth","Polythene Sheet","Twine/Sisal Rope 100m","Caution Tape Yellow/Black","Traffic Cone 750mm","Site Sign Board","Hand Saw 500mm","Panga (Machete)","Axe 2lb","Claw Hammer 16oz","Club Hammer 4lb","Sledge Hammer 7lb","Pliers Combination 8in","Measuring Tape 5m","Measuring Tape 10m","Spirit Level 600mm","Spirit Level 1200mm","Trowel Brick 11in","Trowel Plastering 11in","Float Wooden","Angle Grinder 4.5in","Hammer Drill 13mm","Safety Helmet White","Safety Helmet Yellow","Safety Boots (Gumboots)","Reflective Vest","Work Gloves Leather","Dust Mask N95","Safety Goggles","First Aid Kit","Fire Extinguisher DCP 6kg"],
+"External Works":["Pavers 200x100x60mm (Grey)","Pavers 200x100x60mm (Red)","Pavers 200x100x60mm (Charcoal)","Pavers 200x100x80mm (Grey)","Cabro 200x100x60mm","Kerbs - Mountable 150x250mm x 1m","Kerbs - Barrier 150x300mm x 1m","Edging Kerb 100x150mm x 1m","Asphalt AC 10 - per ton","Asphalt AC 20 - per ton","Prime Coat MC-30 (200L drum)","Tack Coat K1-40 (200L drum)","Road Marking Paint White (5L)","Road Marking Paint Yellow (5L)","Road Marking Beads (25kg)","Grass Seed - Kikuyu (per kg)","Grass Sod / Turf (per m2)","Top Soil - Screened (per ton)","Manure / Compost (per ton)","Geotextile - Non-Woven 200gsm","Geotextile - Woven 300gsm","Subsoil Drain Pipe 100mm Perforated x 50m roll"]};
+var INSPECTION_CHECKLISTS={"1. Mobilization & Setup":["Site handed over","Boundaries confirmed","Access roads OK","Water connected","Power connected","Security in place","First aid station","Site office complete"],"2. Setting Out":["Grid lines checked","Building corners set","Levels verified","Control points protected"],"3. Excavation":["Depth correct","Width correct","Bottom level","Safety slope/batter","Dewatering"],"4. Foundations":["Blinding level","Blinding thickness","DPM installed","DPM lapped","Rebar size","Rebar spacing","Cover blocks","Formwork secure & braced","Kicker height 100-150mm","Formwork plumb & aligned","Joints sealed","Formwork not struck before 24hrs","Concrete grade","Compaction","Curing"],"5. Columns":["Verticality/plumb","Rebar size","Stirrup spacing","Cover adequate","Formwork tight & sealed","Kicker cast","Box dimensions checked","Mould oil applied","Braced both directions","Pour max 1.5m per lift","Removal after 48hrs","Concrete grade","Vibration"],"6. Beams & Slabs":["Formwork level +/-5mm","Props vertical & braced","Props spacing 1.2m max","U-heads & base plates","Beam sides plumb","Mould oil applied","Striking: slabs 14d, beams 21d","Rebar spacing","Cover blocks","BRC chaired","Concrete grade","Compaction","Curing"],"7. Blockwork":["Block type correct","Mortar mix ratio","Alignment/plumb","Bond pattern","Hoop iron","Movement joints","Lintels installed"],"8. Plastering":["Surface prepared","Chicken mesh","Screeds placed","Mix ratio correct","Curing done","No cracks"],"9. Roofing":["Structure type","Underlay installed","Tiles/sheets fixed","Flashings installed","Gutters","Water test"],"10. Finishes":["Tiling level","Painting primer","Painting finish","Skirting installed","Ironmongery fitted","Glazing complete"]};
+var MEETING_AGENDA=["Confirmation of Previous Minutes","Progress Review","Quality & Inspections","Materials & Deliveries","Plant & Equipment","Health & Safety","Variations & Claims","Programme & Delays","Subcontractors","Information Required","Any Other Business","Date of Next Meeting"];
+var CONCRETE_MIXES={"C15/20 Blinding":{"ratio":"1:3:6","cement":"250kg (5 bags)","sand":"0.45m3","ballast":"0.9m3","water":"125L","use":"Blinding, lean concrete"},"C20/25 Light Duty":{"ratio":"1:2.5:5","cement":"300kg (6 bags)","sand":"0.44m3","ballast":"0.88m3","water":"150L","use":"Light duty floors"},"C25/30 General RC":{"ratio":"1:2:4","cement":"350kg (7 bags)","sand":"0.42m3","ballast":"0.84m3","water":"175L","use":"Slabs, beams, columns"},"C30/37 Heavy Duty":{"ratio":"1:2:3","cement":"400kg (8 bags)","sand":"0.40m3","ballast":"0.80m3","water":"200L","use":"Heavy duty, water retaining"},"C35/45 Precast":{"ratio":"1:1.5:3","cement":"450kg (9 bags)","sand":"0.38m3","ballast":"0.76m3","water":"200L","use":"Precast elements"},"C40/50 High Strength":{"ratio":"1:1.5:2.5","cement":"500kg (10 bags)","sand":"0.36m3","ballast":"0.72m3","water":"200L","use":"Bridge works"}};
+
+// ============ NAVIGATION ============
+var NAV=[{id:"dashboard",label:"Home"},{id:"diary",label:"Diary"},{id:"inspections",label:"Inspections"},{id:"ncr",label:"NCRs"},{id:"instructions",label:"S.I."},{id:"materials",label:"Materials"},{id:"stock",label:"Stock"},{id:"cubes",label:"Cubes"},{id:"concrete",label:"Concrete"},{id:"labour",label:"Labour"},{id:"plant",label:"Plant"},{id:"meetings",label:"Meetings"},{id:"delays",label:"Delays"},{id:"drawings",label:"Drawings"},{id:"rfi",label:"RFIs"},{id:"stopwork",label:"Stop Work"},{id:"rejections",label:"Rejections"},{id:"report",label:"REPORT"},{id:"project",label:"Settings"}];
+var current="dashboard";
+function nav(){
+var h="";for(var i=0;i<NAV.length;i++){h+='<button class="'+(NAV[i].id===current?"active":"")+'" onclick="go(\''+NAV[i].id+'\')">'+NAV[i].label+'</button>';}
+document.getElementById("sidebar").innerHTML=h;
+var gdp=document.getElementById("globalDatePicker");if(gdp){gdp.value=globalDate;gdp.max=today();}
+var gdl=document.getElementById("globalDateLabel");if(gdl)gdl.textContent=fmtGlobalDate();
+}
+function toggleMenu(){var s=document.getElementById("sidebar");var o=document.getElementById("overlay");if(s.classList.contains("open")){s.classList.remove("open");o.classList.remove("show");}else{s.classList.add("open");o.classList.add("show");}}
+function go(id){current=id;nav();document.getElementById("content").innerHTML=RENDER[id]?RENDER[id]():"";if(id!=="report")bindInputs();window.scrollTo(0,0);var s=document.getElementById("sidebar");if(s)s.classList.remove("open");var o=document.getElementById("overlay");if(o)o.classList.remove("show");}
+function bindInputs(){document.querySelectorAll("input,select,textarea").forEach(function(el){el.addEventListener("input",function(){if(this.id&&this.id.startsWith("_"))return;if(this.id)D[this.id]=this.value;save();});if(D[el.id]!==undefined&&el.type!=="file")el.value=D[el.id];});}
+// ============ RENDERERS ============
+var SI_CATEGORIES=["Instruct contractor to rectify defective work","Accelerate works to recover delay","Submit method statement for approval","Provide material samples for approval","Increase labour force at ___","Provide additional plant/equipment","Comply with safety requirements","Submit updated programme","Submit as-built drawings","Submit test results for ___","Stop work at ___ until further notice","Provide access for inspection","Protect completed works","Clean site / remove debris","Submit variation quotation","Other"];
+var RENDER={};
+
+// DASHBOARD
+RENDER["dashboard"]=function(){
+var ds=(D.diaries||[]).filter(function(e){return e.date===globalDate;});
+var insp=(D.inspections||[]).filter(function(e){return e.date===globalDate;});
+var nc=(D.ncrs||[]).filter(function(e){return e.status==="open";});
+var lab=(D.labour||[]).filter(function(e){return e.date===globalDate;});
+var pa=(D.plant||[]).filter(function(e){return e.status==="Active";});
+var del=(D.delays||[]).filter(function(e){return e.date===globalDate;});
+var tl=0;for(var i=0;i<lab.length;i++){tl+=parseInt(lab[i].mainCount||0)+parseInt(lab[i].subCount||0);}
+var ip=0,it=0;for(var i=0;i<insp.length;i++){for(var j=0;j<insp[i].items.length;j++){it++;if(insp[i].items[j].pass)ip++;}}
+var ds2=new Date(globalDate).toLocaleDateString("en-KE",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+return '<div style="text-align:center;padding:10px 0"><h2 style="color:#ff9f0a;font-size:22px;margin:0">CONSTRUCTION MANAGER</h2><p style="color:#aaa;font-size:13px">'+ds2+'</p></div>'+
+'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0">'+
+'<div class="card" style="text-align:center;cursor:pointer" onclick="go(\'diary\')"><div style="font-size:28px">&#x1F4D4;</div><div style="font-size:22px;font-weight:bold;color:#ff9f0a">'+ds.length+'</div><small style="color:#aaa">Diary</small></div>'+
+'<div class="card" style="text-align:center;cursor:pointer" onclick="go(\'inspections\')"><div style="font-size:28px">&#x2705;</div><div style="font-size:22px;font-weight:bold;color:'+(it>0&&ip===it?"#30d158":"#ff9f0a")+'">'+(it>0?ip+"/"+it:"0")+'</div><small style="color:#aaa">Inspections</small></div>'+
+'<div class="card" style="text-align:center;cursor:pointer" onclick="go(\'labour\')"><div style="font-size:28px">&#x1F477;</div><div style="font-size:22px;font-weight:bold;color:#0a84ff">'+tl+'</div><small style="color:#aaa">Labour</small></div>'+
+'<div class="card" style="text-align:center;cursor:pointer" onclick="go(\'ncr\')"><div style="font-size:28px">&#x1F6A8;</div><div style="font-size:22px;font-weight:bold;color:'+(nc.length>0?"#ff3b30":"#30d158")+'">'+nc.length+'</div><small style="color:#aaa">Open NCRs</small></div>'+
+'<div class="card" style="text-align:center;cursor:pointer" onclick="go(\'delays\')"><div style="font-size:28px">&#x23F0;</div><div style="font-size:22px;font-weight:bold;color:'+(del.length>0?"#ff9f0a":"#30d158")+'">'+del.length+'</div><small style="color:#aaa">Delays</small></div>'+
+'<div class="card" style="text-align:center;cursor:pointer" onclick="go(\'plant\')"><div style="font-size:28px">&#x1F69C;</div><div style="font-size:22px;font-weight:bold;color:#0a84ff">'+pa.length+'</div><small style="color:#aaa">Plant</small></div>'+
+'</div>'+
+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">'+
+'<button class="btn btn-blue" onclick="go(\'diary\');setTimeout(showDiaryForm,100)">+ Quick Diary</button>'+
+'<button class="btn btn-green" onclick="go(\'inspections\');setTimeout(showInspectionForm,100)">+ Inspection</button>'+
+'<button class="btn" style="background:#ff3b30;color:#fff" onclick="go(\'ncr\');setTimeout(showNCRForm,100)">+ Raise NCR</button>'+
+'<button class="btn" style="background:#0a84ff;color:#fff" onclick="go(\'labour\');setTimeout(showLabourForm,100)">+ Log Labour</button>'+
+'</div>'+
+'<br><button class="btn" style="width:100%;background:#ff9f0a;color:#000;font-size:16px;padding:14px" onclick="go(\'report\')">VIEW REPORT</button><br><br>';
+};
+
+// DIARY
+RENDER["diary"]=function(){
+var list="";var entries=(D.diaries||[]).filter(function(e){return e.date===globalDate;});
+if(entries.length===0){list='<p style="color:#666">No diary entries for this date.</p>';}
+else{for(var i=0;i<entries.length;i++){var e=entries[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.activity+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'diaries\',\''+e.id+'\');go(\'diary\')">X</button></div><p style="font-size:12px;color:#aaa">'+e.location+' | Labour: '+e.labour+' | '+e.time+'</p><p style="font-size:13px">'+e.obs+'</p></div>';}}
+return '<h2>Site Diary</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showDiaryForm()">+ New Diary Entry</button>';
+};
+function showDiaryForm(){
+var wo="";for(var i=0;i<WORK_ITEMS.length;i++){wo+='<option>'+WORK_ITEMS[i]+'</option>';}
+var locs="";for(var i=0;i<SITE_LOCATIONS.length;i++){locs+='<option>'+SITE_LOCATIONS[i]+'</option>';}
+var ob="";for(var i=0;i<OBSERVATIONS.length;i++){ob+='<option>'+OBSERVATIONS[i]+'</option>';}
+var h='<h3>New Diary Entry</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Activity:</label><select id="_da">'+wo+'</select><label>Location:</label><select id="_dl">'+locs+'</select><div class="row"><div><label>Labour Count:</label><input id="_dlb" type="number" value="0"></div><div><label>Equipment:</label><input id="_de" placeholder="e.g. Mixer"></div></div><label>Observation:</label><select id="_do">'+ob+'</select><label>Remarks:</label><textarea id="_dr"></textarea><button class="btn" onclick="saveDiary()">Save Entry</button><button class="btn btn-secondary" onclick="go(\'diary\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveDiary(){
+addItem("diaries",{id:uid(),date:document.getElementById("_entryDate").value,time:new Date().toLocaleTimeString(),activity:document.getElementById("_da").value,location:document.getElementById("_dl").value,labour:document.getElementById("_dlb").value,equipment:document.getElementById("_de").value,obs:document.getElementById("_do").value,remarks:document.getElementById("_dr").value});
+toast("Diary saved!");go("diary");
+}
+
+// INSPECTIONS
+RENDER["inspections"]=function(){
+var list="";var insp=(D.inspections||[]).filter(function(e){return e.date===globalDate;});
+if(insp.length===0){list='<p style="color:#666">No inspections for this date.</p>';}
+else{for(var i=0;i<insp.length;i++){var e=insp[i];var p=0,t=e.items.length;for(var j=0;j<t;j++){if(e.items[j].pass)p++;}list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.phase+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'inspections\',\''+e.id+'\');go(\'inspections\')">X</button></div><p><span class="tag '+(p===t?"tag-pass":"tag-fail")+'">'+p+'/'+t+' Passed</span> '+e.location+'</p></div>';}}
+return '<h2>Inspections</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showInspectionForm()">+ New Inspection</button>';
+};
+function showInspectionForm(){
+var phases="";var keys=Object.keys(INSPECTION_CHECKLISTS);for(var i=0;i<keys.length;i++){phases+='<option value="'+keys[i]+'">'+keys[i]+'</option>';}
+var h='<h3>New Inspection</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Phase:</label><select id="_ip" onchange="loadChecklist()">'+phases+'</select><label>Location:</label><input id="_il" placeholder="e.g. Block A - GF"><div id="_checklist"></div><label>Notes:</label><textarea id="_in"></textarea><button class="btn" onclick="saveInspection()">Save Inspection</button><button class="btn btn-secondary" onclick="go(\'inspections\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadChecklist();
+}
+function loadChecklist(){var phase=document.getElementById("_ip").value;var items=INSPECTION_CHECKLISTS[phase]||[];var h="";for(var i=0;i<items.length;i++){h+='<div style="display:flex;align-items:center;gap:8px;margin:5px 0"><input type="checkbox" id="_ck_'+i+'" checked style="width:auto"><label style="margin:0">'+items[i]+'</label></div>';}document.getElementById("_checklist").innerHTML=h;}
+function saveInspection(){var phase=document.getElementById("_ip").value;var items=INSPECTION_CHECKLISTS[phase]||[];var checklist=[];for(var i=0;i<items.length;i++){var el=document.getElementById("_ck_"+i);checklist.push({label:items[i],pass:el?el.checked:true});}addItem("inspections",{id:uid(),date:document.getElementById("_entryDate").value,phase:phase,location:document.getElementById("_il").value,items:checklist,notes:document.getElementById("_in").value});toast("Inspection saved!");go("inspections");}
+
+// NCR
+RENDER["ncr"]=function(){
+var list="";var ncrs=D.ncrs||[];
+if(ncrs.length===0){list='<p style="color:#666">No NCRs recorded.</p>';}
+else{for(var i=0;i<ncrs.length;i++){var e=ncrs[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.title+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'ncrs\',\''+e.id+'\');go(\'ncr\')">X</button></div><p><span class="tag tag-'+(e.status==="open"?"open":"closed")+'">'+e.status.toUpperCase()+'</span> | '+e.severity+' | '+e.location+'</p><p style="font-size:12px">'+e.desc+'</p></div>';}}
+return '<h2>Non-Conformance Reports</h2>'+list+'<button class="btn btn-blue" onclick="showNCRForm()">+ New NCR</button>';
+};
+function showNCRForm(){
+var cats="";var ckeys=Object.keys(NCR_CATEGORIES);for(var i=0;i<ckeys.length;i++){cats+='<option>'+ckeys[i]+'</option>';}
+var h='<h3>New NCR</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_ncat" onchange="loadNCRItems()">'+cats+'</select><label>Specific Issue:</label><select id="_nitem"></select><label>Title:</label><input id="_ntitle" placeholder="Brief title"><label>Severity:</label><select id="_nsev"><option>Major</option><option>Minor</option><option>Critical</option></select><label>Location:</label><input id="_nloc"><label>Description:</label><textarea id="_ndesc"></textarea><label>Action Required:</label><textarea id="_nact"></textarea><button class="btn" onclick="saveNCR()">Save NCR</button><button class="btn btn-secondary" onclick="go(\'ncr\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadNCRItems();
+}
+function loadNCRItems(){var cat=document.getElementById("_ncat").value;var items=NCR_CATEGORIES[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_nitem").innerHTML=h;}
+function saveNCR(){addItem("ncrs",{id:uid(),date:document.getElementById("_entryDate").value,title:document.getElementById("_ntitle").value,category:document.getElementById("_ncat").value,specificIssue:document.getElementById("_nitem").value,severity:document.getElementById("_nsev").value,location:document.getElementById("_nloc").value,desc:document.getElementById("_ndesc").value,action:document.getElementById("_nact").value,status:"open"});toast("NCR saved!");go("ncr");}
+// SITE INSTRUCTIONS
+RENDER["instructions"]=function(){
+var list="";var sis=D.instructions||[];
+if(sis.length===0){list='<p style="color:#666">No site instructions.</p>';}
+else{for(var i=0;i<sis.length;i++){var e=sis[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>SI to: '+e.issuedTo+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'instructions\',\''+e.id+'\');go(\'instructions\')">X</button></div><p style="font-size:12px">'+e.location+' | Deadline: '+e.deadline+' | <span class="tag tag-'+(e.status==="issued"?"open":"closed")+'">'+e.status+'</span></p><p style="font-size:12px">'+e.desc+'</p></div>';}}
+return '<h2>Site Instructions</h2>'+list+'<button class="btn btn-blue" onclick="showSIForm()">+ New S.I.</button>';
+};
+function showSIForm(){
+var siOpts="";for(var i=0;i<SI_CATEGORIES.length;i++){siOpts+='<option>'+SI_CATEGORIES[i]+'</option>';}
+
+var h='<h3>New Site Instruction</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Issued To:</label><input id="_sito" placeholder="Contractor"><label>Location:</label><input id="_siloc"><label>Instruction Type:</label><select id="_sitype">'+siOpts+'</select><label>Description:</label><textarea id="_sidesc" placeholder="Additional details"></textarea><label>Reference:</label><input id="_siref" placeholder="Drawing/Spec"><label>Deadline:</label><input id="_sidead" type="date"><button class="btn" onclick="saveSI()">Save S.I.</button><button class="btn btn-secondary" onclick="go(\'instructions\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveSI(){addItem("instructions",{id:uid(),date:document.getElementById("_entryDate").value,issuedTo:document.getElementById("_sito").value,location:document.getElementById("_siloc").value,instructionType:document.getElementById("_sitype").value,desc:document.getElementById("_sidesc").value,ref:document.getElementById("_siref").value,deadline:document.getElementById("_sidead").value,status:"issued"});toast("SI saved!");go("instructions");}
+
+// MATERIALS
+RENDER["materials"]=function(){
+var list="";var logs=(D.materialLogs||[]).filter(function(e){return e.date===globalDate;});
+var deliv=logs.filter(function(e){return e.type==="delivery";});
+var used=logs.filter(function(e){return e.type==="usage";});
+if(logs.length===0){list='<p style="color:#666">No material transactions for this date.</p>';}
+else{
+if(deliv.length>0){list+='<h4 style="color:#30d158">Deliveries</h4>';for(var i=0;i<deliv.length;i++){var e=deliv[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.name+' (IN)</h4><button class="btn btn-red btn-sm" onclick="delItem(\'materialLogs\',\''+e.id+'\');go(\'materials\')">X</button></div><p>Qty: '+e.qty+' '+e.unit+' | Source: '+e.source+'</p></div>';}}
+if(used.length>0){list+='<h4 style="color:#ff3b30;margin-top:10px">Used Today</h4>';for(var i=0;i<used.length;i++){var e=used[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.name+' (USED)</h4><button class="btn btn-red btn-sm" onclick="delItem(\'materialLogs\',\''+e.id+'\');go(\'materials\')">X</button></div><p>Qty: '+e.qty+' '+e.unit+' | Location: '+e.location+'</p></div>';}}
+}
+return '<h2>Materials</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<div style="display:flex;gap:8px"><button class="btn btn-green" onclick="showDeliveryForm()">+ Delivery</button><button class="btn btn-red" onclick="showUsageForm()">+ Usage</button></div>';
+};
+function showDeliveryForm(){
+var cats="";var ckeys=Object.keys(MATERIAL_CATALOG);for(var i=0;i<ckeys.length;i++){cats+='<option>'+ckeys[i]+'</option>';}
+var h='<h3>Log Material Delivery</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_mcat" onchange="loadMatItems()">'+cats+'</select><label>Material:</label><select id="_mitem"></select><div class="row"><div><label>Quantity:</label><input id="_mqty" type="number"></div><div><label>Unit:</label><select id="_munit"><option>Bags</option><option>Tonnes</option><option>m3</option><option>Pieces</option><option>Bundles</option><option>Liters</option><option>Rolls</option><option>Lengths</option><option>Sheets</option></select></div></div><label>Source/Supplier:</label><input id="_msrc"><button class="btn btn-green" onclick="saveDelivery()">Save Delivery</button><button class="btn btn-secondary" onclick="go(\'materials\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadMatItems();
+}
+function showUsageForm(){
+var cats="";var ckeys=Object.keys(MATERIAL_CATALOG);for(var i=0;i<ckeys.length;i++){cats+='<option>'+ckeys[i]+'</option>';}
+var h='<h3>Log Material Usage</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_mcat" onchange="loadMatItems()">'+cats+'</select><label>Material:</label><select id="_mitem"></select><div class="row"><div><label>Quantity Used:</label><input id="_mqty" type="number"></div><div><label>Unit:</label><select id="_munit"><option>Bags</option><option>Tonnes</option><option>m3</option><option>Pieces</option><option>Bundles</option><option>Liters</option><option>Rolls</option><option>Lengths</option><option>Sheets</option></select></div></div><label>Location Used:</label><input id="_msrc" placeholder="e.g. Block A - GF"><button class="btn btn-red" onclick="saveUsage()">Save Usage</button><button class="btn btn-secondary" onclick="go(\'materials\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadMatItems();
+}
+function loadMatItems(){var cat=document.getElementById("_mcat").value;var items=MATERIAL_CATALOG[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_mitem").innerHTML=h;}
+function saveDelivery(){addItem("materialLogs",{id:uid(),type:"delivery",date:document.getElementById("_entryDate").value,category:document.getElementById("_mcat").value,name:document.getElementById("_mitem").value,qty:document.getElementById("_mqty").value,unit:document.getElementById("_munit").value,source:document.getElementById("_msrc").value});var en=document.getElementById("_mitem").value;var eq=parseFloat(document.getElementById("_mqty").value)||0;var eu=document.getElementById("_munit").value;var ed=document.getElementById("_entryDate").value;var ec=document.getElementById("_mcat").value;var found=false;for(var i=0;i<D.stock.length;i++){if(D.stock[i].name===en&&D.stock[i].unit===eu){D.stock[i].qty+=eq;found=true;break;}}if(!found){D.stock.push({id:uid(),name:en,category:ec,qty:eq,unit:eu,minStock:10,date:ed});}save();toast("Delivery logged!");go("materials");}
+function saveUsage(){addItem("materialLogs",{id:uid(),type:"usage",date:document.getElementById("_entryDate").value,category:document.getElementById("_mcat").value,name:document.getElementById("_mitem").value,qty:document.getElementById("_mqty").value,unit:document.getElementById("_munit").value,location:document.getElementById("_msrc").value});var en=document.getElementById("_mitem").value;var eq=parseFloat(document.getElementById("_mqty").value)||0;var eu=document.getElementById("_munit").value;for(var i=0;i<D.stock.length;i++){if(D.stock[i].name===en&&D.stock[i].unit===eu){D.stock[i].qty-=eq;break;}}save();toast("Usage logged!");go("materials");}
+
+// CONCRETE MIX DESIGN
+RENDER["stock"]=function(){
+var list="";var stock=D.stock||[];
+var toolCats=["Tools & Site Equipment"];var low=stock.filter(function(e){return e.qty<=e.minStock&&toolCats.indexOf(e.category)===-1;});
+if(low.length>0){list+='<div class="card" style="background:#331111;border:1px solid #ff3b30"><h4 style="color:#ff3b30">LOW STOCK ALERTS</h4>';for(var i=0;i<low.length;i++){list+='<p style="color:#ff3b30">'+low[i].name+': '+low[i].qty+' '+low[i].unit+' left (Min: '+low[i].minStock+')</p>';}list+='</div>';}
+list+='<table><tr><th>Material</th><th>Category</th><th>Qty</th><th>Unit</th><th>Status</th></tr>';
+if(stock.length===0){list+='<tr><td colspan="5">No stock. Log deliveries to build inventory.</td></tr>';}
+else{for(var i=0;i<stock.length;i++){var s=stock[i];var isTool=toolCats.indexOf(s.category)!==-1;var st=isTool?"TOOL":s.qty<=s.minStock?"LOW":s.qty<=s.minStock*2?"OK":"GOOD";var sc=isTool?"tag-open":s.qty<=s.minStock?"tag-fail":s.qty<=s.minStock*2?"tag-open":"tag-pass";list+='<tr><td>'+s.name+'</td><td>'+s.category+'</td><td>'+s.qty+'</td><td>'+s.unit+'</td><td><span class="tag '+sc+'">'+st+'</span></td></tr>';}}
+list+='</table>';
+return '<h2>Stock / Inventory</h2>'+list+'<br><button class="btn btn-sm btn-blue" onclick="rebuildStock();go(\'stock\')">Recalculate Stock</button>';
+};
+// ============ CONCRETE CUBE TESTS ============
+var CUBE_GRADES=["C15/20","C20/25","C25/30","C30/37","C35/45","C40/50"];
+var POUR_LOCATIONS=["Foundations - Pad Footing","Foundations - Strip Footing","Ground Floor Slab","Column - GF","Column - 1F","Column - 2F","Beam - GF","Beam - 1F","Suspended Slab 1F","Suspended Slab Roof","Staircase","Retaining Wall","Lift Pit","Septic Tank","Underground Tank","Boundary Wall Foundation","Drainage Works","External Paving"];
+RENDER["cubes"]=function(){
+var list="";var cubes=(D.concreteCubes||[]).filter(function(e){return e.date===globalDate;});
+if(cubes.length===0){list='<p style="color:#666">No cube tests for this date.</p>';}
+else{for(var i=0;i<cubes.length;i++){var c=cubes[i];var r7=c.r7?c.r7+' N/mm2':'Pending';var r14=c.r14?c.r14+' N/mm2':'Pending';var r28=c.r28?c.r28+' N/mm2':'Pending';var pass=c.r28&&c.r28>=c.required?'tag-pass':c.r28&&c.r28<c.required?'tag-fail':'tag-open';var status=c.r28?(c.r28>=c.required?'PASS':'FAIL'):'PENDING';list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>Cube '+c.cubeId+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'concreteCubes\',\''+c.id+'\');go(\'cubes\')">X</button></div><p>Grade: '+c.grade+' | Pour: '+c.pourDate+' | '+c.location+'</p><div class="row"><div><small>7-Day</small><br><b>'+r7+'</b></div><div><small>14-Day</small><br><b>'+r14+'</b></div><div><small>28-Day</small><br><b>'+r28+'</b></div></div><p>Required: '+c.required+' N/mm2 | <span class="tag '+pass+'">'+status+'</span></p></div>';}}
+return '<h2>Concrete Cube Tests</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showCubeForm()">+ Add Cube Test</button>';
+};
+function showCubeForm(){
+var g="";for(var i=0;i<CUBE_GRADES.length;i++){g+='<option>'+CUBE_GRADES[i]+'</option>';}
+var l="";for(var i=0;i<POUR_LOCATIONS.length;i++){l+='<option>'+POUR_LOCATIONS[i]+'</option>';}
+var h='<h3>New Cube Test</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Cube ID:</label><input id="_cubeId" placeholder="e.g. CUBE-001"><label>Concrete Grade:</label><select id="_cubeGrade">'+g+'</select><label>Pour Location:</label><select id="_cubeLoc">'+l+'</select><label>Pour Date:</label><input type="date" id="_pourDate" value="'+globalDate+'"><label>Required Strength (N/mm2):</label><input id="_cubeReq" type="number" value="25"><div class="row"><div><label>7-Day (N/mm2):</label><input id="_cube7" type="number" step="0.1"></div><div><label>14-Day:</label><input id="_cube14" type="number" step="0.1"></div><div><label>28-Day:</label><input id="_cube28" type="number" step="0.1"></div></div><button class="btn" onclick="saveCube()">Save Cube</button><button class="btn btn-secondary" onclick="go(\'cubes\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveCube(){
+if(!D.concreteCubes)D.concreteCubes=[];
+var g=document.getElementById("_cubeGrade").value;
+var req={"C15/20":15,"C20/25":20,"C25/30":25,"C30/37":30,"C35/45":35,"C40/50":40}[g]||25;
+D.concreteCubes.push({id:uid(),date:document.getElementById("_entryDate").value,cubeId:document.getElementById("_cubeId").value,grade:g,location:document.getElementById("_cubeLoc").value,pourDate:document.getElementById("_pourDate").value,required:parseFloat(document.getElementById("_cubeReq").value)||req,r7:document.getElementById("_cube7").value||null,r14:document.getElementById("_cube14").value||null,r28:document.getElementById("_cube28").value||null,timestamp:Date.now()});
+save();toast("Cube test saved!");go("cubes");
+}
+RENDER["concrete"]=function(){
+var h='<h2>CONCRETE & MORTAR CALCULATOR</h2>';
+h+='<div style="display:flex;gap:4px;margin:10px 0;flex-wrap:wrap">';
+h+='<button id="cbCalc" class="btn btn-sm" style="background:#ff9f0a;color:#000" onclick="cTab(\'calc\')">Calculator</button>';
+h+='<button id="cbRef" class="btn btn-sm btn-secondary" onclick="cTab(\'ref\')">Mix Reference</button>';
+h+='<button id="cbTest" class="btn btn-sm btn-secondary" onclick="cTab(\'test\')">Field Tests</button>';
+h+='<button id="cbAdmix" class="btn btn-sm btn-secondary" onclick="cTab(\'admix\')">Admixtures</button>';
+h+='</div>';
+h+='<div id="cCalc"><div class="card"><label>Mix Type:</label><select id="cmt" onchange="cUp()"><option value="concrete">Concrete (Structural)</option><option value="mortar">Mortar (Blockwork/Plaster)</option></select></div><div class="card"><h4>Calculator</h4><label>Structure:</label><select id="cct" onchange="cDim()"><option value="slab">Slab / Floor</option><option value="beam">Beam</option><option value="column">Column</option><option value="footing">Footing / Pad</option><option value="wall">Wall</option><option value="cylinder">Circular Column</option></select><div id="ccd"></div><label>Grade:</label><select id="ccg" onchange="cCalc()"></select><label>Wastage:</label><select id="ccw" onchange="cCalc()"><option value="1">0%</option><option value="1.05" selected>5%</option><option value="1.1">10%</option></select><div id="ccr" style="margin-top:10px;padding:10px;background:#111;border-radius:8px"></div></div></div>';
+h+='<div id="cRef" style="display:none"><h3>Concrete Mixes (per m3)</h3><div id="cRefC"></div><h3 style="margin-top:15px">Mortar Mixes (per m3)</h3><div id="cRefM"></div><div class="card" style="font-size:12px"><h4>Batching Guide</h4><p><b>1 bag cement</b> = 50kg = 0.035 m3</p><p><b>1 wheelbarrow</b> = ~0.065 m3 (65 litres)</p><p><b>1 bucket (20L)</b> = 0.02 m3</p></div></div>';
+h+='<div id="cTest" style="display:none"><div class="card" style="font-size:12px"><h4>Slump Test (Workability)</h4><p><b>Equipment:</b> Slump cone 300mm, tamping rod 16mm, base plate</p><p><b>Target:</b> 50-100mm for normal RC | 25-50mm pavements | 100-150mm pumped</p><p><b>Procedure:</b> Fill cone in 3 equal layers, rod each 25 times, strike off top, lift cone vertically in 5 seconds, measure drop</p><p><b>Fail if:</b> Collapses (too wet), shears off (no cohesion), zero slump (too dry)</p></div><div class="card" style="font-size:12px"><h4>Cube Test (Compressive Strength)</h4><p><b>Mould:</b> 150mm x 150mm x 150mm steel</p><p><b>Sample:</b> Cast minimum 3 cubes per batch</p><p><b>Curing:</b> Submerge in clean water at 20-25C until testing</p><p><b>7-day:</b> 60-70% of design strength</p><p><b>28-day:</b> Full strength (C25 = 25 N/mm2 minimum)</p></div><div class="card" style="font-size:12px"><h4>Site Quick Tests</h4><p><b>Ball Test:</b> Squeeze concrete - should hold shape, not crumble or bleed</p><p><b>Trowel Test:</b> Pat surface - should float smooth, paste cover aggregate</p><p><b>Water Test:</b> Compact - no free water should rise to surface</p><p><b>Segregation:</b> Drop small amount - coarse aggregate stays mixed</p></div><div class="card" style="font-size:12px"><h4>Curing Requirements</h4><p><b>Normal:</b> Keep continuously wet for 7 days minimum</p><p><b>Ponding:</b> Best for slabs - create water pond</p><p><b>Hessian:</b> Cover with wet hessian, keep damp</p><p><b>Spraying:</b> Mist 3-4 times daily</p><p><b>Formwork:</b> Columns 2 days, beams/slabs 7-14 days</p><p><b>Hot (>30C):</b> Start within 30min | <b>Cold (<5C):</b> Protect 72hrs</p></div></div>';
+h+='<div id="cAdmix" style="display:none"><div class="card" style="font-size:12px"><h4>Concrete Admixtures Guide</h4><p><b>Waterproofer (Liquid):</b> 200ml per 50kg bag</p><p><b>Waterproofer (Powder):</b> 1kg per 50kg bag</p><p><b>Accelerator:</b> 1-2L per 50kg bag (cold weather)</p><p><b>Retarder:</b> 0.5-1L per 50kg bag (hot weather)</p><p><b>Plasticiser:</b> 150ml per 50kg bag - reduces water 10-15%</p><p><b>Superplasticiser:</b> 0.5-1.5L per 50kg - flowing concrete</p><p><b>Bonding Agent (SBR):</b> 1:1 with water as primer, 1:4 in mix</p><p><b>Curing Compound:</b> Apply 1L per 4-5m2 after finishing</p><p><b>Air Entrainer:</b> 50-100ml per 50kg (freeze-thaw resistance)</p><p><b>Shrinkage Reducer:</b> 2-3L per m3 - reduces cracking</p><p><b>Corrosion Inhibitor:</b> 3-5L per m3 (marine/saline areas)</p><p><b>Colouring Pigment:</b> 2-5kg per 50kg bag</p><p><b>Fibres (Polypropylene):</b> 900g per m3 - reduces plastic cracking</p><p><b>Fibres (Steel):</b> 20-40kg per m3 (industrial floors)</p></div></div>';
+setTimeout(function(){cUp();buildRef();},200);
+return h;
+};
+var CONC_MIXES={"C15/20 Blinding":{r:"1:3:6",c:250,s:0.45,b:0.9,w:125,u:"Blinding, lean concrete"},"C20/25 Light Duty":{r:"1:2.5:5",c:300,s:0.44,b:0.88,w:150,u:"Light duty floors"},"C25/30 General RC":{r:"1:2:4",c:350,s:0.42,b:0.84,w:175,u:"Slabs, beams, columns"},"C30/37 Heavy Duty":{r:"1:2:3",c:400,s:0.40,b:0.80,w:200,u:"Heavy duty, water retaining"},"C35/45 Precast":{r:"1:1.5:3",c:450,s:0.38,b:0.76,w:200,u:"Precast elements"},"C40/50 High Strength":{r:"1:1.5:2.5",c:500,s:0.36,b:0.72,w:200,u:"Bridge works"}};
+var CONC_MORTAR={"Blockwork 1:4":{r:"1:4",c:350,s:1.0,w:175,u:"Standard blockwork"},"Blockwork 1:3":{r:"1:3",c:450,s:0.95,w:200,u:"Heavy/retaining walls"},"Plaster 1:4 (Internal)":{r:"1:4",c:300,s:0.85,w:150,u:"Internal plaster"},"Plaster 1:3 (External)":{r:"1:3",c:400,s:0.80,w:180,u:"External rendering"},"Screed 1:3":{r:"1:3",c:450,s:0.90,w:200,u:"Floor screed 50mm"},"Tiling 1:2":{r:"1:2",c:600,s:0.60,w:280,u:"Tile bedding"},"Pointing 1:1":{r:"1:1",c:900,s:0.50,w:400,u:"Grouting/pointing"}};
+var CONC_EXPLAIN={"C15/20 Blinding":"1 bag : 3 wheelbarrows sand : 6 ballast : 25L water","C20/25 Light Duty":"1 bag : 2.5 wheelbarrows sand : 5 ballast : 25L water","C25/30 General RC":"1 bag : 2 wheelbarrows sand : 4 ballast : 25L water","C30/37 Heavy Duty":"1 bag : 2 wheelbarrows sand : 3 ballast : 25L water","C35/45 Precast":"1 bag : 1.5 wheelbarrows sand : 3 ballast : 22L water","C40/50 High Strength":"1 bag : 1.5 wheelbarrows sand : 2.5 ballast : 20L water","Blockwork 1:4":"1 bag : 4 wheelbarrows sand : 25L water","Blockwork 1:3":"1 bag : 3 wheelbarrows sand : 22L water","Plaster 1:4 (Internal)":"1 bag : 4 wheelbarrows sand : 25L water","Plaster 1:3 (External)":"1 bag : 3 wheelbarrows sand : 22L water","Screed 1:3":"1 bag : 3 wheelbarrows sand : 22L water","Tiling 1:2":"1 bag : 2 wheelbarrows sand : 22L water","Pointing 1:1":"1 bag : 1 wheelbarrow sand : 22L water"};
+
+function cTab(t){
+var ids=["cCalc","cRef","cTest","cAdmix"];
+for(var i=0;i<ids.length;i++){var el=document.getElementById(ids[i]);if(el)el.style.display="none";}
+var show=document.getElementById(t==="calc"?"cCalc":t==="ref"?"cRef":t==="test"?"cTest":"cAdmix");
+if(show)show.style.display="block";
+["calc","ref","test","admix"].forEach(function(x){
+var b=document.getElementById("cb"+x.charAt(0).toUpperCase()+x.slice(1));
+if(b){b.style.background=x===t?"#ff9f0a":"#333";b.style.color=x===t?"#000":"#fff";}
+});
+if(t==="ref"){buildRef();}
+}
+
+function cUp(){
+var t=document.getElementById("cmt").value;
+var s=document.getElementById("cct");
+if(t==="concrete"){s.innerHTML='<option value="slab">Slab</option><option value="beam">Beam</option><option value="column">Column</option><option value="footing">Footing</option><option value="wall">Wall</option><option value="cylinder">Circular Column</option>';}
+else{s.innerHTML='<option value="wall_area">Wall Area (m2)</option><option value="floor_area">Floor Area (m2)</option><option value="volume">Volume (m3)</option>';}
+var g=document.getElementById("ccg");
+var data=t==="concrete"?CONC_MIXES:CONC_MORTAR;
+var keys=Object.keys(data);
+g.innerHTML='';for(var i=0;i<keys.length;i++){g.innerHTML+='<option>'+keys[i]+'</option>';}
+cDim();
+}
+
+function cDim(){
+var t=document.getElementById("cmt").value;
+var s=document.getElementById("cct").value;
+var d=document.getElementById("ccd");var h="";
+if(t==="concrete"){
+if(s=="slab")h='<div class="row"><div>Length (m):<br><input id="ccl" type="number" value="5" step="0.1" onchange="cCalc()"></div><div>Width (m):<br><input id="ccw" type="number" value="4" step="0.1" onchange="cCalc()"></div></div>Thickness (mm):<br><input id="cch" type="number" value="150" onchange="cCalc()">';
+else if(s=="beam")h='Length (m):<br><input id="ccl" type="number" value="6" step="0.1" onchange="cCalc()"><div class="row"><div>Width (mm):<br><input id="ccw" type="number" value="230" onchange="cCalc()"></div><div>Depth (mm):<br><input id="cch" type="number" value="450" onchange="cCalc()"></div></div>';
+else if(s=="column")h='<div class="row"><div>Width (mm):<br><input id="ccw" type="number" value="230" onchange="cCalc()"></div><div>Depth (mm):<br><input id="cch" type="number" value="230" onchange="cCalc()"></div></div>Height (m):<br><input id="ccl" type="number" value="3" step="0.1" onchange="cCalc()">';
+else if(s=="footing")h='<div class="row"><div>Length (m):<br><input id="ccl" type="number" value="1.5" step="0.1" onchange="cCalc()"></div><div>Width (m):<br><input id="ccw" type="number" value="1.5" step="0.1" onchange="cCalc()"></div></div>Thickness (mm):<br><input id="cch" type="number" value="300" onchange="cCalc()">';
+else if(s=="wall")h='Length (m):<br><input id="ccl" type="number" value="10" step="0.1" onchange="cCalc()"><div class="row"><div>Thickness (mm):<br><input id="ccw" type="number" value="200" onchange="cCalc()"></div><div>Height (m):<br><input id="cch" type="number" value="2.5" step="0.1" onchange="cCalc()"></div></div>';
+else if(s=="cylinder")h='Diameter (mm):<br><input id="ccw" type="number" value="300" onchange="cCalc()">Height (m):<br><input id="ccl" type="number" value="3" step="0.1" onchange="cCalc()">';
+}else{
+if(s=="wall_area")h='Wall Area (m2):<br><input id="ccl" type="number" value="50" step="0.1" onchange="cCalc()">Thickness (mm):<br><input id="cch" type="number" value="150" onchange="cCalc()">';
+else if(s=="floor_area")h='Floor Area (m2):<br><input id="ccl" type="number" value="20" step="0.1" onchange="cCalc()">Thickness (mm):<br><input id="cch" type="number" value="50" onchange="cCalc()">';
+else if(s=="volume")h='Volume (m3):<br><input id="ccl" type="number" value="1" step="0.1" onchange="cCalc()">';
+}
+d.innerHTML=h;cCalc();
+}
+
+function cCalc(){
+var t=document.getElementById("cmt").value;
+var s=document.getElementById("cct").value;
+var l=parseFloat((document.getElementById("ccl")||{}).value)||0;
+var w=parseFloat((document.getElementById("ccw")||{}).value)||0;
+var hh=parseFloat((document.getElementById("cch")||{}).value)||0;
+var vol=0;
+if(t==="concrete"){
+if(s=="slab")vol=l*w*(hh/1000);
+else if(s=="beam")vol=l*(w/1000)*(hh/1000);
+else if(s=="column")vol=(w/1000)*(hh/1000)*l;
+else if(s=="footing")vol=l*w*(hh/1000);
+else if(s=="wall")vol=l*(w/1000)*hh;
+else if(s=="cylinder")vol=Math.PI*Math.pow(w/2000,2)*l;
+}else{
+if(s=="wall_area"||s=="floor_area")vol=l*(hh/1000);
+else vol=l;
+}
+var waste=parseFloat((document.getElementById("ccw")||{}).value)||1;vol*=waste;
+var gr=document.getElementById("ccg").value;
+var data=t==="concrete"?CONC_MIXES:CONC_MORTAR;
+var mx=data[gr]||{};
+var cem=mx.c||0;
+var cb=Math.ceil((vol*cem)/50);
+var sd=(vol*(mx.s||0)).toFixed(2);
+var bl=mx.b?(vol*mx.b).toFixed(2):null;
+var wt=Math.round(vol*(mx.w||0));
+var r=document.getElementById("ccr");
+var txt='<b style="color:#ff9f0a">RESULTS</b><br>Volume: <b>'+vol.toFixed(3)+' m3</b><br><br><b>Cement:</b> '+cb+' bags ('+(cb*50)+' kg)<br><b>Sand:</b> '+sd+' m3';
+if(bl)txt+='<br><b>Ballast:</b> '+bl+' m3';
+txt+='<br><b>Water:</b> ~'+wt+' litres<br><small style="color:#ff9f0a">'+mx.r+' | '+(CONC_EXPLAIN[gr]||"")+'</small>';
+r.innerHTML=txt;
+}
+
+function buildRef(){
+var rc="",rm="";
+var ck=Object.keys(CONC_MIXES);
+for(var i=0;i<ck.length;i++){var g=ck[i];var m=CONC_MIXES[g];
+rc+='<div class="card"><b>'+g+'</b><br>Ratio: '+m.r+' | Cement: '+m.c+' kg | Sand: '+m.s+' m3 | Ballast: '+m.b+' m3<br>Water: '+m.w+'L | '+m.u+'<br><small style="color:#ff9f0a">'+(CONC_EXPLAIN[g]||"")+'</small></div>';}
+var mk=Object.keys(CONC_MORTAR);
+for(var i=0;i<mk.length;i++){var g=mk[i];var m=CONC_MORTAR[g];
+rm+='<div class="card"><b>'+g+'</b><br>Ratio: '+m.r+' | Cement: '+m.c+' kg | Sand: '+m.s+' m3<br>Water: '+m.w+'L | '+m.u+'<br><small style="color:#ff9f0a">'+(CONC_EXPLAIN[g]||"")+'</small></div>';}
+document.getElementById("cRefC").innerHTML=rc;
+document.getElementById("cRefM").innerHTML=rm;
+}
+RENDER["labour"]=function(){
+var list="";var lab=(D.labour||[]).filter(function(e){return e.date===globalDate;});
+var trades=["Site Agent","Masons","Carpenters","Steel Fixers","Plumbers","Painters","General","Other"];
+if(lab.length===0){list='<p style="color:#666">No labour logged for this date.</p>';}
+else{list='<table><tr><th>Trade</th><th>Main Contractor</th><th>Sub-Contractor</th></tr>';for(var t=0;t<trades.length;t++){var m=0,s=0;for(var l=0;l<lab.length;l++){if(lab[l].trade===trades[t]){m+=parseInt(lab[l].mainCount||0);s+=parseInt(lab[l].subCount||0);}}if(m>0||s>0){list+='<tr><td>'+trades[t]+'</td><td>'+m+'</td><td>'+s+'</td></tr>';}}list+='</table>';}
+return '<h2>Labour & Attendance</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showLabourForm()">+ Add Labour</button>';
+};
+function showLabourForm(){
+var h='<h3>Add Labour</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Trade:</label><select id="_ltrade"><option>Site Agent</option><option>Masons</option><option>Carpenters</option><option>Steel Fixers</option><option>Plumbers</option><option>Painters</option><option>General</option><option>Other</option></select><div class="row"><div><label>Main Contractor:</label><input id="_lmain" type="number" value="0"></div><div><label>Sub-Contractor:</label><input id="_lsub" type="number" value="0"></div></div><label>Company (if Sub):</label><input id="_lcomp" placeholder="Sub-contractor name"><button class="btn" onclick="saveLabour()">Add</button><button class="btn btn-secondary" onclick="go(\'labour\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveLabour(){addItem("labour",{id:uid(),date:document.getElementById("_entryDate").value,trade:document.getElementById("_ltrade").value,mainCount:document.getElementById("_lmain").value,subCount:document.getElementById("_lsub").value,company:document.getElementById("_lcomp").value});toast("Labour added!");go("labour");}
+
+// PLANT
+RENDER["plant"]=function(){
+var list="";var plant=D.plant||[];
+if(plant.length===0){list='<p style="color:#666">No plant logged.</p>';}
+else{for(var i=0;i<plant.length;i++){var e=plant[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.name+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'plant\',\''+e.id+'\');go(\'plant\')">X</button></div><p>Qty: '+e.qty+' | Status: <span class="tag '+(e.status==="Active"?"tag-pass":e.status==="Breakdown"?"tag-fail":"tag-open")+'">'+e.status+'</span></p></div>';}}
+return '<h2>Plant & Equipment</h2>'+list+'<button class="btn btn-blue" onclick="showPlantForm()">+ Add Equipment</button>';
+};
+function showPlantForm(){
+var h='<h3>Add Plant/Equipment</h3><label>Equipment:</label><select id="_pname"><optgroup label="LIFTING"><option>Tower Crane</option><option>Mobile Crane</option><option>Chain Block</option></optgroup><optgroup label="EARTHMOVING"><option>Excavator 20T</option><option>Backhoe Loader</option><option>Bulldozer</option><option>Wheel Loader</option></optgroup><optgroup label="CONCRETE"><option>Concrete Mixer</option><option>Concrete Pump</option><option>Poker Vibrator</option><option>Power Trowel</option></optgroup><optgroup label="COMPACTION"><option>Roller 10T</option><option>Plate Compactor</option><option>Rammer</option></optgroup><optgroup label="POWER"><option>Generator 5kVA</option><option>Generator 25kVA</option><option>Generator 100kVA</option><option>Lighting Tower</option></optgroup><optgroup label="WATER"><option>Water Pump 2in</option><option>Water Pump 3in</option><option>Submersible Pump</option></optgroup><optgroup label="SCAFFOLDING"><option>Steel Scaffolding</option><option>Mobile Tower</option><option>Scissor Lift</option></optgroup><optgroup label="STEEL/FORMWORK"><option>Bar Bending Machine</option><option>Bar Cutting Machine</option><option>Welding Machine</option><option>Steel Shutters</option></optgroup><optgroup label="SURVEY"><option>Total Station</option><option>Auto Level</option><option>GPS Rover</option></optgroup><optgroup label="OTHER"><option>Forklift 3T</option><option>Telehandler</option><option>Other</option></optgroup></select><div class="row"><div><label>Quantity:</label><input id="_pqty" type="number" value="1"></div><div><label>Status:</label><select id="_pstatus"><option>Active</option><option>Idle</option><option>Breakdown</option></select></div></div><button class="btn" onclick="savePlant()">Add</button><button class="btn btn-secondary" onclick="go(\'plant\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function savePlant(){addItem("plant",{id:uid(),name:document.getElementById("_pname").value,qty:document.getElementById("_pqty").value,status:document.getElementById("_pstatus").value});toast("Equipment added!");go("plant");}
+
+// MEETINGS
+RENDER["meetings"]=function(){
+var list="";var meets=(D.meetings||[]).filter(function(e){return e.date===globalDate;});
+if(meets.length===0){list='<p style="color:#666">No meetings for this date.</p>';}
+else{for(var i=0;i<meets.length;i++){var e=meets[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>Meeting '+e.meetingNo+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'meetings\',\''+e.id+'\');go(\'meetings\')">X</button></div><p>'+e.date+' | '+e.venue+' | '+e.attendees+'</p><p style="font-size:11px;color:#aaa">'+e.agendaItems+'</p></div>';}}
+return '<h2>Meeting Minutes</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showMeetingForm()">+ New Meeting</button>';
+};
+function showMeetingForm(){
+var ag="";for(var i=0;i<MEETING_AGENDA.length;i++){ag+='<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><input type="checkbox" id="_ag_'+i+'" style="width:auto"><label style="margin:0;font-size:12px">'+MEETING_AGENDA[i]+'</label></div>';}
+var h='<h3>New Meeting Minutes</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Meeting No:</label><input id="_mtno" placeholder="MOM-001"><label>Time:</label><input id="_mttime" placeholder="10:00 AM"><label>Venue:</label><input id="_mtvenue" placeholder="Site office"><label>Attendees:</label><textarea id="_mtatt" placeholder="List of attendees"></textarea><label>Agenda Items:</label><div style="background:#111;padding:8px;border-radius:8px;max-height:200px;overflow-y:auto">'+ag+'</div><label>Key Discussions:</label><textarea id="_mtdisc"></textarea><label>Action Items:</label><textarea id="_mtact"></textarea><button class="btn" onclick="saveMeeting()">Save Minutes</button><button class="btn btn-secondary" onclick="go(\'meetings\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveMeeting(){var sel=[];for(var i=0;i<MEETING_AGENDA.length;i++){var cb=document.getElementById("_ag_"+i);if(cb&&cb.checked)sel.push(MEETING_AGENDA[i]);}addItem("meetings",{id:uid(),date:document.getElementById("_entryDate").value,meetingNo:document.getElementById("_mtno").value,time:document.getElementById("_mttime").value,venue:document.getElementById("_mtvenue").value,attendees:document.getElementById("_mtatt").value,agendaItems:sel.join(", "),discussions:document.getElementById("_mtdisc").value,actions:document.getElementById("_mtact").value});toast("Meeting saved!");go("meetings");}
+
+// DELAYS
+RENDER["delays"]=function(){
+var list="";var delays=(D.delays||[]).filter(function(e){return e.date===globalDate;});
+if(delays.length===0){list='<p style="color:#666">No delays for this date.</p>';}
+else{for(var i=0;i<delays.length;i++){var e=delays[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.cause+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'delays\',\''+e.id+'\');go(\'delays\')">X</button></div><p>'+e.duration+' hrs | '+e.impact+' | '+e.location+'</p></div>';}}
+return '<h2>Delays & Disruptions</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showDelayForm()">+ Log Delay</button>';
+};
+function showDelayForm(){
+var cats="";var ckeys=Object.keys(DELAY_CATEGORIES);for(var i=0;i<ckeys.length;i++){cats+='<option>'+ckeys[i]+'</option>';}
+var h='<h3>Log Delay</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_dcat" onchange="loadDelayItems()">'+cats+'</select><label>Specific Cause:</label><select id="_ditem"></select><div class="row"><div><label>Duration (Hours):</label><input id="_ddur" type="number" value="1"></div><div><label>Impact:</label><select id="_dimp"><option>Major</option><option>Minor</option><option>Critical</option></select></div></div><label>Location:</label><input id="_dloc"><button class="btn" onclick="saveDelay()">Log Delay</button><button class="btn btn-secondary" onclick="go(\'delays\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadDelayItems();
+}
+function loadDelayItems(){var cat=document.getElementById("_dcat").value;var items=DELAY_CATEGORIES[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_ditem").innerHTML=h;}
+function saveDelay(){addItem("delays",{id:uid(),date:document.getElementById("_entryDate").value,category:document.getElementById("_dcat").value,cause:document.getElementById("_ditem").value,duration:document.getElementById("_ddur").value,impact:document.getElementById("_dimp").value,location:document.getElementById("_dloc").value});toast("Delay logged!");go("delays");}
+// ============ REPORT ============
+var reportDate=globalDate;
+function rdate(){return new Date(reportDate).toLocaleDateString("en-KE",{weekday:"long",day:"numeric",month:"long",year:"numeric"});}
+
+// ============ DRAWINGS REGISTER ============
+RENDER["drawings"]=function(){
+var list="";var drawings=D.drawings||[];
+if(drawings.length===0){list='<p style="color:#666">No drawings registered.</p>';}
+else{for(var i=0;i<drawings.length;i++){var d=drawings[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+d.number+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'drawings\',\''+d.id+'\');go(\'drawings\')">X</button></div><p>'+d.title+'</p><p style="font-size:12px;color:#aaa">Rev: '+d.revision+' | Discipline: '+d.discipline+' | Received: '+d.dateReceived+'</p></div>';}}
+return '<h2>Drawings Register</h2>'+list+'<button class="btn btn-blue" onclick="showDrawingForm()">+ Add Drawing</button>';
+};
+function showDrawingForm(){
+var h='<h3>Add Drawing</h3><label>Drawing Number:</label><input id="_dwgNo" placeholder="e.g. STR/001"><label>Title:</label><input id="_dwgTitle" placeholder="Drawing title"><label>Discipline:</label><select id="_dwgDisc"><option>Structural</option><option>Architectural</option><option>Civil</option><option>Mechanical</option><option>Electrical</option><option>Plumbing</option><option>Fire Services</option><option>Landscape</option><option>Interior Design</option></select><label>Revision:</label><input id="_dwgRev" placeholder="A"><label>Date Received:</label><input type="date" id="_dwgDate" value="'+globalDate+'"><label>Notes:</label><textarea id="_dwgNotes" placeholder="Any notes about this drawing"></textarea><button class="btn" onclick="saveDrawing()">Save Drawing</button><button class="btn btn-secondary" onclick="go(\'drawings\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveDrawing(){
+if(!D.drawings)D.drawings=[];
+D.drawings.push({id:uid(),number:document.getElementById("_dwgNo").value,title:document.getElementById("_dwgTitle").value,discipline:document.getElementById("_dwgDisc").value,revision:document.getElementById("_dwgRev").value,dateReceived:document.getElementById("_dwgDate").value,notes:document.getElementById("_dwgNotes").value,timestamp:Date.now()});
+save();toast("Drawing saved!");go("drawings");
+}
+// ============ RFIs ============
+var RFI_CATEGORIES={"Structural":["Clarify reinforcement detail","Confirm concrete grade","Clarify foundation depth","Confirm rebar size/spacing","Clarify construction joint locations","Request structural approval for substitution","Confirm load-bearing capacity"],"Architectural":["Clarify floor finish type","Confirm ceiling height","Clarify wall finish","Request door/window schedule","Clarify colour scheme","Confirm tile size/pattern","Request elevation detail"],"Plumbing":["Clarify pipe sizing","Confirm drainage invert levels","Request plumbing schematic","Clarify water tank capacity","Confirm sanitary ware specification"],"Electrical":["Clarify cable sizing","Confirm DB location","Request lighting layout","Clarify emergency lighting","Confirm socket heights","Request earthing detail"]};
+RENDER["rfi"]=function(){
+var list="";var rfis=(D.rfis||[]).filter(function(e){return e.date===globalDate;});
+if(rfis.length===0){list='<p style="color:#666">No RFIs for this date.</p>';}
+else{for(var i=0;i<rfis.length;i++){var r=rfis[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+r.subject+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'rfis\',\''+r.id+'\');go(\'rfi\')">X</button></div><p><span class="tag tag-'+(r.status==="open"?"open":"closed")+'">'+r.status+'</span> | To: '+r.sentTo+'</p><p style="font-size:12px">'+r.question+'</p></div>';}}
+return '<h2>Requests for Information</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showRFIForm()">+ New RFI</button>';
+};
+function showRFIForm(){
+var cats="";var ck=Object.keys(RFI_CATEGORIES);for(var i=0;i<ck.length;i++){cats+='<option>'+ck[i]+'</option>';}
+var h='<h3>New RFI</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_rfiCat" onchange="loadRFIItems()">'+cats+'</select><label>Specific Question:</label><select id="_rfiItem"></select><label>Subject:</label><input id="_rfiSubj" placeholder="Brief subject"><label>Sent To:</label><input id="_rfiTo" placeholder="Consultant/Engineer"><label>Full Details:</label><textarea id="_rfiDetail"></textarea><button class="btn" onclick="saveRFI()">Save RFI</button><button class="btn btn-secondary" onclick="go(\'rfi\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadRFIItems();
+}
+function loadRFIItems(){var cat=document.getElementById("_rfiCat").value;var items=RFI_CATEGORIES[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_rfiItem").innerHTML=h;}
+function saveRFI(){
+if(!D.rfis)D.rfis=[];
+D.rfis.push({id:uid(),date:document.getElementById("_entryDate").value,category:document.getElementById("_rfiCat").value,question:document.getElementById("_rfiItem").value,subject:document.getElementById("_rfiSubj").value,sentTo:document.getElementById("_rfiTo").value,detail:document.getElementById("_rfiDetail").value,status:"open",timestamp:Date.now()});
+save();toast("RFI saved!");go("rfi");
+}
+// ============ STOP WORK ORDERS ============
+var SWO_CATEGORIES={"Safety - Immediate Danger":["Unsafe scaffolding","Excavation collapse risk","Live electrical hazard","Working at height without fall protection","Unsafe crane/lifting operation","Confined space without permit"],"Quality - Major Defect":["Structural failure risk","Wrong concrete grade","Major honeycombing","Foundation bearing inadequate","Reinforcement not as per design","Waterproofing failure"],"Non-Compliance":["Working without approved drawings","Using unapproved materials","Deviation from method statement","Subcontractor not approved","Works outside approved scope"],"Environmental":["Pollution incident","Dust/noise beyond permitted","Damage to protected vegetation","Unauthorized waste disposal"]};
+RENDER["stopwork"]=function(){
+var list="";var swos=(D.stopWorkOrders||[]).filter(function(e){return e.date===globalDate;});
+if(swos.length===0){list='<p style="color:#666">No stop work orders.</p>';}
+else{for(var i=0;i<swos.length;i++){var s=swos[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+s.reason+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'stopWorkOrders\',\''+s.id+'\');go(\'stopwork\')">X</button></div><p><span class="tag tag-'+(s.status==="active"?"fail":"closed")+'">'+s.status+'</span> | '+s.location+'</p><p style="font-size:12px">Resume conditions: '+s.resumption+'</p></div>';}}
+return '<h2>Stop Work Orders</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showSWOForm()">+ New SWO</button>';
+};
+function showSWOForm(){
+var cats="";var ck=Object.keys(SWO_CATEGORIES);for(var i=0;i<ck.length;i++){cats+='<option>'+ck[i]+'</option>';}
+var h='<h3>New Stop Work Order</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_swoCat" onchange="loadSWOItems()">'+cats+'</select><label>Specific Reason:</label><select id="_swoItem"></select><label>Location:</label><input id="_swoLoc"><label>Work to Stop:</label><textarea id="_swoWork"></textarea><label>Conditions for Resumption:</label><textarea id="_swoResume"></textarea><button class="btn" onclick="saveSWO()">Save SWO</button><button class="btn btn-secondary" onclick="go(\'stopwork\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadSWOItems();
+}
+function loadSWOItems(){var cat=document.getElementById("_swoCat").value;var items=SWO_CATEGORIES[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_swoItem").innerHTML=h;}
+function saveSWO(){
+if(!D.stopWorkOrders)D.stopWorkOrders=[];
+D.stopWorkOrders.push({id:uid(),date:document.getElementById("_entryDate").value,category:document.getElementById("_swoCat").value,reason:document.getElementById("_swoItem").value,location:document.getElementById("_swoLoc").value,workToStop:document.getElementById("_swoWork").value,resumption:document.getElementById("_swoResume").value,status:"active",timestamp:Date.now()});
+save();toast("SWO saved!");go("stopwork");
+}
+// ============ MATERIAL REJECTIONS ============
+var MRN_CATEGORIES={"Cement & Binders":["Expired/old stock","Lumpy/hardened cement","Wrong type delivered","Damaged bags - water ingress"],"Reinforcement Steel":["Wrong diameter/grade","Excessive rust/corrosion","Bent/buckled bars","Wrong length delivered","No mill certificate"],"Blocks & Bricks":["Cracked/broken blocks","Wrong size/type","Under-strength","Uneven edges/poor finish"],"Aggregates":["Wrong size/grading","Contaminated with silt","Contains organic matter","Wrong source not approved"],"Timber":["Not treated as specified","Wrong species/grade","Excessive knots/warping","Moisture content too high"],"Plumbing":["Wrong pipe material/size","Damaged/cracked pipes","No test certificates","Counterfeit branded items"],"Electrical":["Wrong cable size","Not to KEBS standard","Damaged insulation","No test certificate"],"Finishes":["Wrong colour/shade","Damaged/opened tins","Expired paint","Wrong tile batch","Chipped/broken tiles"],"Roofing":["Wrong gauge/thickness","Pre-rusted sheets","Wrong profile/colour","Damaged during transport"],"General":["Not to approved sample","No delivery note","No test certificate","Quantity short delivered"]};
+RENDER["rejections"]=function(){
+var list="";var rej=(D.materialRejections||[]).filter(function(e){return e.date===globalDate;});
+if(rej.length===0){list='<p style="color:#666">No material rejections.</p>';}
+else{for(var i=0;i<rej.length;i++){var r=rej[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+r.material+'</h4><button class="btn btn-red btn-sm" onclick="delItem(\'materialRejections\',\''+r.id+'\');go(\'rejections\')">X</button></div><p>Qty: '+r.qty+' | Supplier: '+r.supplier+'</p><p style="font-size:12px;color:#ff3b30">'+r.reason+'</p></div>';}}
+return '<h2>Material Rejections (MRN)</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<button class="btn btn-blue" onclick="showMRNForm()">+ New Rejection</button>';
+};
+function showMRNForm(){
+var cats="";var ck=Object.keys(MRN_CATEGORIES);for(var i=0;i<ck.length;i++){cats+='<option>'+ck[i]+'</option>';}
+var h='<h3>New Material Rejection</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_mrnCat" onchange="loadMRNItems()">'+cats+'</select><label>Specific Issue:</label><select id="_mrnItem"></select><label>Material:</label><input id="_mrnMat"><div class="row"><div><label>Quantity:</label><input id="_mrnQty"></div><div><label>Supplier:</label><input id="_mrnSupp"></div></div><label>Action:</label><select id="_mrnAction"><option>Remove from site and replace</option><option>Quarantine for inspection</option><option>Return to supplier</option><option>Reject and dispose</option></select><button class="btn" onclick="saveMRN()">Save Rejection</button><button class="btn btn-secondary" onclick="go(\'rejections\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;loadMRNItems();
+}
+function loadMRNItems(){var cat=document.getElementById("_mrnCat").value;var items=MRN_CATEGORIES[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_mrnItem").innerHTML=h;}
+function saveMRN(){
+if(!D.materialRejections)D.materialRejections=[];
+D.materialRejections.push({id:uid(),date:document.getElementById("_entryDate").value,category:document.getElementById("_mrnCat").value,reason:document.getElementById("_mrnItem").value,material:document.getElementById("_mrnMat").value,qty:document.getElementById("_mrnQty").value,supplier:document.getElementById("_mrnSupp").value,action:document.getElementById("_mrnAction").value,timestamp:Date.now()});
+save();toast("MRN saved!");go("rejections");
+}
+RENDER["report"]=function(){
+reportDate=globalDate;
+var dt=(D.diaries||[]).filter(function(e){return e.date===reportDate;});
+var insp=(D.inspections||[]).filter(function(e){return e.date===reportDate;});
+var ncrs=(D.ncrs||[]).filter(function(e){return e.date===reportDate;});
+var sis=(D.instructions||[]).filter(function(e){return e.date===reportDate;});
+var delays=(D.delays||[]).filter(function(e){return e.date===reportDate;});
+var logs=(D.materialLogs||[]).filter(function(e){return e.date===reportDate;});
+var mats=logs.filter(function(e){return e.type==="delivery";});
+var used=logs.filter(function(e){return e.type==="usage";});
+var lab=(D.labour||[]).filter(function(e){return e.date===reportDate;});
+var plant=D.plant||[];
+var meets=(D.meetings||[]).filter(function(e){return e.date===reportDate;});
+var isToday=reportDate===today();
+var rn="COW/"+(D.savedReports?D.savedReports.length+1:1)+"/"+reportDate.substring(0,4);
+var totalWorkers=0;for(var i=0;i<lab.length;i++){totalWorkers+=parseInt(lab[i].mainCount||0)+parseInt(lab[i].subCount||0);}
+
+// Work progress
+var workText="";for(var i=0;i<dt.length;i++){workText+=dt[i].activity+" - "+dt[i].location+"\n"+dt[i].obs+(dt[i].remarks?" ("+dt[i].remarks+")":"")+"\n\n";}if(!workText)workText="No diary entries.\n";
+
+// Labour table
+var labourTable="";var trades=["Site Agent","Masons","Carpenters","Steel Fixers","Plumbers","Painters","General","Other"];for(var t=0;t<trades.length;t++){var m=0,s=0;for(var l=0;l<lab.length;l++){if(lab[l].trade===trades[t]){m+=parseInt(lab[l].mainCount||0);s+=parseInt(lab[l].subCount||0);}}if(m>0||s>0)labourTable+="<tr><td>"+trades[t]+"</td><td>"+m+"</td><td>"+s+"</td></tr>";}if(!labourTable)labourTable='<tr><td colspan="3">No labour recorded</td></tr>';
+
+// Plant
+var plantTable="";for(var i=0;i<plant.length;i++){plantTable+="<tr><td>"+plant[i].name+"</td><td>"+(plant[i].qty||"1")+"</td><td>"+plant[i].status+"</td></tr>";}if(!plantTable)plantTable='<tr><td colspan="3">No plant recorded</td></tr>';
+
+// Materials
+var matText="";for(var i=0;i<mats.length;i++){matText+=(i+1)+". "+mats[i].name+" - "+mats[i].qty+" "+mats[i].unit+" from "+mats[i].source+"\n";}if(!matText)matText="No deliveries.\n";
+var usedText="";for(var i=0;i<used.length;i++){usedText+=(i+1)+". "+used[i].name+" - "+used[i].qty+" "+used[i].unit+" at "+used[i].location+"\n";}
+
+// Inspections
+var inspText="";for(var i=0;i<insp.length;i++){var p=0,f=0;for(var j=0;j<insp[i].items.length;j++){if(insp[i].items[j].pass)p++;else f++;}inspText+=insp[i].phase+" at "+insp[i].location+": "+p+"/"+(p+f)+" passed\n";}if(!inspText)inspText="No inspections.\n";
+
+// NCRs
+var ncrText="";for(var i=0;i<ncrs.length;i++){ncrText+=(i+1)+". "+ncrs[i].title+" ("+ncrs[i].severity+") - "+ncrs[i].desc.substring(0,80)+"... ["+ncrs[i].status+"]\n";}if(!ncrText)ncrText="No NCRs.\n";
+
+// SIs
+var siText="";for(var i=0;i<sis.length;i++){siText+=(i+1)+". To: "+sis[i].issuedTo+" - "+sis[i].desc.substring(0,60)+"... (Deadline: "+sis[i].deadline+")\n";}if(!siText)siText="No SIs.\n";
+
+// Delays
+var delayText="";var totalHrs=0;for(var i=0;i<delays.length;i++){delayText+=delays[i].cause+" - "+delays[i].duration+" hrs ("+delays[i].impact+")\n";totalHrs+=parseInt(delays[i].duration||0);}if(!delayText)delayText="No delays.\n";
+
+// Meetings
+var meetText="";for(var i=0;i<meets.length;i++){meetText+=meets[i].meetingNo+" at "+meets[i].venue+": "+meets[i].agendaItems+"\n";}
+
+return '<div style="background:#2C2C2E;border-radius:8px;padding:8px;margin-bottom:10px"><div style="text-align:center"><label style="color:#F78166;font-size:12px">Select Report Date:</label><br><input type="date" id="_reportDatePicker" value="'+reportDate+'" max="'+today()+'" style="width:auto;display:inline-block;font-size:16px;text-align:center;background:#333;color:#fff;border:1px solid #ff9f0a;border-radius:8px;padding:8px;margin:5px 0" onchange="reportDate=this.value;go(\'report\')"><br><small style="color:#A0A0B8;font-size:10px">'+(isToday?"TODAY":rdate())+'</small></div></div>'+
+'<div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">'+
+'<button class="btn btn-sm btn-blue" onclick="printReport()">PDF</button>'+
+'<button class="btn btn-sm btn-green" onclick="copyReport()">Copy</button>'+
+'<button class="btn btn-sm" style="background:#FF9500" onclick="saveReport()">Save</button>'+
+'</div>'+
+'<div class="report-preview" id="rp" contenteditable="true" style="font-size:11px">'+
+'<h3>CLERK OF WORKS - DAILY SITE REPORT</h3>'+
+'<p style="text-align:center;color:#666;font-size:10px">Republic of Kenya - Ministry of Public Works Format</p><hr>'+
+'<p><strong>CONTRACT NO:</strong> '+(D.contractNo||"___________")+' <strong>PROJECT:</strong> '+(D.projectName||"________________________")+'</p>'+
+'<p><strong>CONTRACTOR:</strong> '+(D.mainContractor||"________________________")+' <strong>DATE:</strong> '+rdate()+'</p>'+
+'<p><strong>REPORT NO:</strong> '+rn+' <strong>REPORTED BY:</strong> '+(D.cowName||"________________________")+'</p>'+
+'<p><strong>WEATHER:</strong> '+(D.weatherMorning||"___")+' / '+(D.weatherAfternoon||"___")+' <strong>TEMP:</strong> '+(D.tempNotes||"___")+'</p><hr>'+
+'<h4>1.0 WORK IN PROGRESS</h4><p>'+workText.replace(/\n/g,"<br>")+'</p><hr>'+
+'<h4>2.0 LABOUR ON SITE</h4><table><tr><th>Trade</th><th>Main</th><th>Sub</th></tr>'+labourTable+'<tr><th>TOTAL</th><th colspan="2">'+totalWorkers+' workers</th></tr></table><hr>'+
+'<h4>3.0 PLANT & EQUIPMENT</h4><table><tr><th>Equipment</th><th>Qty</th><th>Status</th></tr>'+plantTable+'</table><hr>'+
+'<h4>4.0 MATERIALS DELIVERED</h4><p>'+matText.replace(/\n/g,"<br>")+'</p><h4>4.1 MATERIALS USED</h4><p>'+(usedText||"None").replace(/\n/g,"<br>")+'</p><hr>'+
+'<h4>5.0 INSPECTIONS</h4><p>'+inspText.replace(/\n/g,"<br>")+'</p><hr>'+
+'<h4>6.0 NON-CONFORMANCE REPORTS</h4><p>'+ncrText.replace(/\n/g,"<br>")+'</p><hr>'+
+'<h4>7.0 SITE INSTRUCTIONS</h4><p>'+siText.replace(/\n/g,"<br>")+'</p><hr>'+
+'<h4>8.0 DELAYS / DISRUPTIONS</h4><p><strong>Time Lost:</strong> '+totalHrs+' hrs</p><p>'+delayText.replace(/\n/g,"<br>")+'</p><hr>'+
+'<h4>9.0 MEETINGS</h4><p>'+(meetText||"None").replace(/\n/g,"<br>")+'</p><hr>'+
+'<h4>10.0 GENERAL REMARKS</h4><p>Work is progressing in accordance with the approved programme and specifications unless otherwise noted.</p><hr>'+
+'<div style="display:flex;justify-content:space-between;margin-top:10px">'+
+'<div style="text-align:center">_________________<br><b>'+(D.cowName||"[COW Name]")+'</b><br><small>Clerk of Works</small><br>Date: '+rdate()+'</div>'+
+'<div style="text-align:center">_________________<br><b>'+(D.contractorRepName||"[Contractor Rep]")+'</b><br><small>Contractors Representative</small><br>Date: ................</div>'+
+'</div>'+
+'<p style="text-align:center;font-size:8px;margin-top:10px">Generated by Construction Manager | '+rn+' | '+reportDate+'</p>'+
+'</div>'+
+'<p style="color:#ff9f0a;margin-top:8px;text-align:center;font-size:11px">Click anywhere on the report to edit directly before printing.</p>';
+};
+
+function saveReport(){if(!D.savedReports)D.savedReports=[];D.savedReports.push({id:uid(),date:reportDate,timestamp:Date.now()});save();toast("Report saved!");go("report");}
+function printReport(){var c=document.getElementById("rp").innerHTML;var w=window.open("","_blank","width=900,height=700");w.document.write('<!DOCTYPE html><html><head><title>Daily Site Report</title><style>body{font-family:monospace;font-size:10px;line-height:1.4;padding:15px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px}hr{border:1px solid #000}h3{text-align:center;font-size:13px}h4{font-size:11px;margin:6px 0}@media print{body{margin:0;padding:8px}}</style></head><body>'+c+'</body></html>');w.document.close();setTimeout(function(){w.print();},500);}
+function copyReport(){var c=document.getElementById("rp").innerText;navigator.clipboard.writeText(c).then(function(){toast("Report copied!");});}
+// ============ SETTINGS ============
+RENDER["project"]=function(){
+return '<h2>Project Settings</h2>'+
+'<label>Project Name:</label><input id="projectName">'+
+'<div class="row"><div><label>Contract No:</label><input id="contractNo"></div><div><label>W.P. Item No:</label><input id="wpItemNo"></div></div>'+
+'<div class="row"><div><label>Site Location:</label><input id="siteLocation"></div><div><label>County:</label><input id="county"></div></div>'+
+'<label>Main Contractor:</label><input id="mainContractor">'+
+'<h4 style="margin-top:15px">Site Conditions</h4>'+
+'<div class="row"><div><label>Weather AM:</label><select id="weatherMorning"><option value="">-</option><option>Sunny</option><option>Rainy</option><option>Cloudy</option><option>Windy</option></select></div><div><label>Weather PM:</label><select id="weatherAfternoon"><option value="">-</option><option>Sunny</option><option>Rainy</option><option>Cloudy</option><option>Windy</option></select></div></div>'+
+'<div class="row"><div><label>Ground:</label><select id="groundCondition"><option value="">-</option><option>Dry</option><option>Muddy</option><option>Flooded</option></select></div><div><label>Temp/Notes:</label><input id="tempNotes"></div></div>'+
+'<h4 style="margin-top:15px">Sign-Off Details</h4>'+
+'<div class="row"><div><label>COW Name:</label><input id="cowName"></div><div><label>Date/Time:</label><input id="cowDateTime"></div></div>'+
+'<div class="row"><div><label>Contractor Rep:</label><input id="contractorRepName"></div><div><label>Date/Time:</label><input id="contractorRepDateTime"></div></div>'+
+'<br><button class="btn" onclick="save();toast(\'Settings saved!\');go(\'dashboard\')">Save Settings</button>';
+};
+
+// ============ INIT ============
+nav();go("dashboard");
+</script>
+</body>
+</html>
