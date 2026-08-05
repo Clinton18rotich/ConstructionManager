@@ -5,22 +5,31 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     
-    <!-- Hard hat -->
+    <!-- Hard hat (safety) -->
     <path
         android:fillColor="#FF9F0A"
-        android:pathData="M34,55 Q54,30 74,55 L74,75 Q54,68 34,75 Z"/>
+        android:pathData="M34,50 Q54,22 74,50 L74,72 Q54,64 34,72 Z"/>
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M40,52 Q54,36 68,52 L68,65 Q54,60 40,65 Z"/>
+        android:pathData="M40,48 Q54,28 68,48 L68,62 Q54,56 40,62 Z"/>
     
-    <!-- Building silhouette -->
+    <!-- Building structure -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M70,45 L78,45 L78,55 L70,55 Z M75,40 L80,35 L85,40 L85,45 L75,45 Z"/>
+        android:pathData="M70,42 L76,42 L76,52 L70,52 Z M73,38 L77,34 L81,38 L81,42 L73,42 Z"/>
     
-    <!-- Level line -->
+    <!-- Level line (precision) -->
     <path
         android:strokeColor="#FF9F0A"
-        android:strokeWidth="2"
-        android:pathData="M20,90 L88,90"/>
+        android:strokeWidth="3"
+        android:pathData="M22,88 L86,88"/>
+    <path
+        android:fillColor="#FF9F0A"
+        android:pathData="M40,84 L40,92 L44,90 L48,92 L48,84 Z"/>
+    
+    <!-- Blueprint/grid -->
+    <path
+        android:strokeColor="#0A84FF"
+        android:strokeWidth="0.5"
+        android:pathData="M25,78 L83,78 M30,74 L30,80 M54,74 L54,80 M78,74 L78,80"/>
 </vector>
