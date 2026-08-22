@@ -84,7 +84,7 @@ for(var j=0;j<D.stock.length;j++){if(D.stock[j].name===l.name&&D.stock[j].unit==
 if(!f){D.stock.push({id:uid(),name:l.name,category:l.category||"",qty:l.type==="delivery"?parseFloat(l.qty):-parseFloat(l.qty),unit:l.unit||"",minStock:10,date:l.date});}}
 save();}
 rebuildStock();
-function getDefault(){return {reportNo:"",date:new Date().toISOString().split("T")[0],projectName:"",wpItemNo:"",contractNo:"",siteLocation:"",county:"",mainContractor:"",weatherMorning:"",weatherAfternoon:"",groundCondition:"",tempNotes:"",diaries:[],inspections:[],ncrs:[],instructions:[],materials:[],materialLogs:[],stock:[],concreteCubes:[],concretePours:[],drawings:[],rfis:[],stopWorkOrders:[],mirs:[],materialRejections:[],labour:[],plant:[],meetings:[],delays:[],cowName:"",cowDateTime:"",contractorRepName:"",contractorRepDateTime:""};}
+function getDefault(){return {reportNo:"",date:new Date().toISOString().split("T")[0],projectName:"",wpItemNo:"",contractNo:"",siteLocation:"",county:"",mainContractor:"",weatherMorning:"",weatherAfternoon:"",groundCondition:"",tempNotes:"",diaries:[],inspections:[],ncrs:[],instructions:[],materials:[],materialLogs:[],stock:[],concreteCubes:[],concretePours:[],drawings:[],rfis:[],stopWorkOrders:[],mirs:[],materialRejections:[],labour:[],workers:[],attendance:[],plant:[],meetings:[],delays:[],cowName:"",cowDateTime:"",contractorRepName:"",contractorRepDateTime:""};}
 function save(){localStorage.setItem(K,JSON.stringify(D));}
 function toast(m){var t=document.getElementById("toast");t.textContent=m;t.style.display="block";setTimeout(function(){t.style.display="none";},2000);}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
@@ -310,7 +310,7 @@ RENDER["dashboard"]=function(){
 var ds=(D.diaries||[]).filter(function(e){return e.date===globalDate;});
 var insp=(D.inspections||[]).filter(function(e){return e.date===globalDate;});
 var nc=(D.ncrs||[]).filter(function(e){return e.status==="open";});
-var lab=(D.labour||[]).filter(function(e){return e.date===globalDate;});
+var lab=(D.attendance||[]).filter(function(e){return e.date===globalDate;});
 var pa=(D.plant||[]).filter(function(e){return e.status==="Active";});
 var del=(D.delays||[]).filter(function(e){return e.date===globalDate;});
 var tl=0;for(var i=0;i<lab.length;i++){tl+=parseInt(lab[i].mainCount||0)+parseInt(lab[i].subCount||0);}
@@ -522,49 +522,55 @@ D.concretePours.push({id:uid(),date:document.getElementById("_entryDate").value,
 save();toast("Pour saved!");go("concrete");
 }
 RENDER["labour"]=function(){
-var h='<h2>Labour & Workforce</h2><p style="color:#aaa;font-size:12px">Daily attendance with names & tasks</p>';
-h+='<div style="display:flex;gap:8px;margin:10px 0"><button class="btn btn-blue btn-sm" onclick="showLabourForm()">+ Add Worker</button></div>';
-var lab=(D.labour||[]).filter(function(e){return e.date===globalDate;});
-if(lab.length===0){h+='<p style="color:#666">No labour recorded for this date.</p>';}
+var h='<h2>Workers Register</h2><p style="color:#aaa;font-size:12px">Register workers once - tick attendance daily</p>';
+var workers=(D.workers||[]);
+if(workers.length===0){h+='<p style="color:#666">No workers registered yet.</p>';}
 else{
-var trades={};var totalWorkers=0;
-for(var i=0;i<lab.length;i++){var l=lab[i];var key=l.trade;if(!trades[key])trades[key]=[];trades[key].push(l);totalWorkers++;}
-h+='<div class="card" style="background:#1a1a2e;text-align:center"><div class="row"><div><div style="font-size:28px;color:#ff9f0a">'+totalWorkers+'</div><small>Total Workers</small></div><div><div style="font-size:28px;color:#30d158">'+Object.keys(trades).length+'</div><small>Trades Present</small></div></div></div>';
-var tk=Object.keys(trades);
-for(var t=0;t<tk.length;t++){var td=trades[tk[t]];
-h+='<div class="card"><h4>'+tk[t]+' ('+td.length+' workers)</h4><table style="font-size:10px"><tr><th>Name</th><th>Company</th><th>Hours</th><th>Status</th><th>Task</th><th></th></tr>';
-for(var i=0;i<td.length;i++){var l=td[i];h+='<tr><td><b>'+(l.workerName||"-")+'</b></td><td>'+(l.company||"-")+'</td><td>'+l.hours+'h</td><td><span class="tag '+(l.status==="Present"?"tag-pass":l.status==="Absent"?"tag-fail":"tag-open")+'">'+(l.status||"Present")+'</span></td><td style="font-size:9px">'+(l.task||"-")+'</td><td><button class="btn btn-red btn-sm" style="padding:1px 4px;font-size:9px" onclick="delItem(\'labour\',\''+l.id+'\');go(\'labour\')">X</button></td></tr>';}
-h+='</table></div>';
+h+='<div class="card" style="background:#1a1a2e;text-align:center"><div style="font-size:28px;color:#ff9f0a">'+workers.length+'</div><small>Registered Workers</small></div>';
+h+='<table style="font-size:11px"><tr><th>Name</th><th>Trade</th><th>Company</th><th>Phone</th><th>Present Today</th><th></th></tr>';
+for(var i=0;i<workers.length;i++){var w=workers[i];
+var present=(D.attendance||[]).filter(function(a){return a.workerId===w.id&&a.date===globalDate;});
+h+='<tr><td><b>'+w.name+'</b></td><td>'+w.trade+'</td><td>'+(w.company||"-")+'</td><td>'+(w.phone||"-")+'</td><td><input type="checkbox" '+(present.length>0?"checked":"")+' onchange="toggleAttendance(\''+w.id+'\')"></td><td><button class="btn btn-red btn-sm" style="padding:2px 6px;font-size:10px" onclick="removeWorker(\''+w.id+'\')">X</button></td></tr>';}
+h+='</table>';
+var presentToday=(D.attendance||[]).filter(function(a){return a.date===globalDate;});
+if(presentToday.length>0){
+h+='<h4 style="margin-top:10px">Assign Tasks for Today</h4>';
+h+='<table style="font-size:10px"><tr><th>Worker</th><th>Trade</th><th>Task</th></tr>';
+for(var i=0;i<presentToday.length;i++){var a=presentToday[i];
+var w=workers.find(function(x){return x.id===a.workerId;});
+if(w&&w.trade!=="Site Agent/Foreman"&&w.trade!=="Other/Specialists"){
+h+='<tr><td>'+w.name+'</td><td>'+w.trade+'</td><td><select id="_task_'+w.id+'" onchange="assignTask(\''+w.id+'\')"><option value="">Select task...</option>'+getAllTasksOptions()+'</select></td></tr>';
+}else if(w){
+h+='<tr><td>'+w.name+'</td><td>'+w.trade+'</td><td><small style="color:#aaa">'+(w.trade==="Site Agent/Foreman"?"Supervisory role":"Specialist")+'</small></td></tr>';
 }
 }
+h+='</table>';
+}
+}
+h+='<button class="btn btn-blue" onclick="showWorkerForm()" style="margin-top:10px">+ Register New Worker</button>';
 return h;
 };
-function showLabourForm(){
-var tasks="";
-tasks+='<optgroup label="FOUNDATIONS"><option>Excavation & Earthworks</option><option>Blinding & DPM</option><option>Foundation Rebar</option><option>Foundation Formwork</option><option>Foundation Concreting</option></optgroup>';
-tasks+='<optgroup label="SUPERSTRUCTURE"><option>Column Rebar</option><option>Column Formwork</option><option>Column Concreting</option><option>Beam Rebar</option><option>Beam Formwork</option><option>Beam Concreting</option><option>Slab Rebar</option><option>Slab Formwork</option><option>Slab Concreting</option></optgroup>';
-tasks+='<optgroup label="BLOCKWORK"><option>Blockwork GF</option><option>Blockwork Upper</option><option>Hoop Iron</option><option>Lintels</option><option>Ring Beam</option></optgroup>';
-tasks+='<optgroup label="ROOFING"><option>Roof Structure</option><option>Sheet Roofing</option><option>Tile Roofing</option><option>Ridge & Flashing</option><option>Gutters</option></optgroup>';
-tasks+='<optgroup label="PLUMBING"><option>Plumbing First Fix</option><option>Plumbing Second Fix</option><option>Drainage</option><option>Pressure Testing</option></optgroup>';
-tasks+='<optgroup label="ELECTRICAL"><option>Electrical First Fix</option><option>Electrical Second Fix</option><option>DB & Termination</option><option>Testing</option></optgroup>';
-tasks+='<optgroup label="FINISHES"><option>Plastering</option><option>Rendering</option><option>Floor Screeding</option><option>Wall Tiling</option><option>Floor Tiling</option><option>Painting</option></optgroup>';
-tasks+='<optgroup label="JOINERY"><option>Ceiling</option><option>Door Frames</option><option>Door Leaves</option><option>Windows</option><option>Skirting & Architrave</option></optgroup>';
-tasks+='<optgroup label="HEAVY CIVIL"><option>Dredging Operations</option><option>Railway Track Works</option><option>Railway Station Works</option><option>Dam Construction</option><option>Quay Wall Construction</option><option>Jetty/Pier Construction</option><option>Breakwater Construction</option><option>Tunnel Boring/TBM</option><option>Tunnel Lining</option><option>Underwater Works</option><option>Water Treatment Plant</option><option>Borehole Drilling</option><option>Intake Construction</option></optgroup>';
-tasks+='<optgroup label="SHORING"><option>Shoring Installation</option><option>Underpinning Works</option></optgroup><optgroup label="STAIRCASE"><option>Staircase Formwork</option><option>Staircase Rebar</option><option>Staircase Concreting</option><option>Staircase Finishing</option><option>Staircase Handrail</option></optgroup><optgroup label="GENERAL"><option>Site Cleaning</option><option>Material Offloading</option><option>Scaffolding</option><option>Formwork Assembly</option><option>Steel Fixing</option><option>Concreting</option><option>Demolition</option></optgroup>';
-var h='<h3>Add Worker</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'">';
-h+='<label>Worker Name:</label><input id="_lname" placeholder="Full name of worker">';
-h+='<label>Trade:</label><select id="_ltrade"><option>Site Agent/Foreman</option><option>Masons</option><option>Carpenters</option><option>Steel Fixers</option><option>Plumbers</option><option>Electricians</option><option>Welders</option><option>Painters</option><option>Plasterers</option><option>Tilers</option><option>Scaffolders</option><option>Plant Operators</option><option>General Labourers</option><option>Unskilled Labourers</option><option>Other/Specialists</option></select>';
-h+='<label>Company:</label><input id="_lcomp" placeholder="Main Contractor or Sub-contractor">';
-h+='<div class="row"><div><label>Hours:</label><select id="_lhours"><option value="8">Full Day (8hrs)</option><option value="4">Half Day (4hrs)</option><option value="10">Overtime (10hrs)</option><option value="12">Extended (12hrs)</option></select></div><div><label>Status:</label><select id="_lstatus"><option value="Present">✅ Present</option><option value="Late">⚠️ Late</option><option value="Absent">❌ Absent</option><option value="Sick">🏥 Sick</option><option value="Leave">📋 Leave</option></select></div></div>';
-h+='<label>Task/Gang:</label><select id="_ltask">'+tasks+'</select>';
-h+='<button class="btn" onclick="saveLabour()">Add Worker</button><button class="btn btn-secondary" onclick="go(\'labour\')">Cancel</button>';
+function getAllTasksOptions(){
+var t='<optgroup label="FOUNDATIONS"><option>Excavation & Earthworks</option><option>Blinding & DPM</option><option>Foundation Rebar</option><option>Foundation Formwork</option><option>Foundation Concreting</option></optgroup>';
+t+='<optgroup label="SUPERSTRUCTURE"><option>Column Rebar</option><option>Column Formwork</option><option>Column Concreting</option><option>Beam Rebar</option><option>Beam Formwork</option><option>Beam Concreting</option><option>Slab Rebar</option><option>Slab Formwork</option><option>Slab Concreting</option></optgroup>';
+t+='<optgroup label="BLOCKWORK"><option>Blockwork GF</option><option>Blockwork Upper</option><option>Hoop Iron</option><option>Lintels</option><option>Ring Beam</option></optgroup>';
+t+='<optgroup label="ROOFING"><option>Roof Structure</option><option>Sheet Roofing</option><option>Tile Roofing</option><option>Ridge & Flashing</option><option>Gutters</option></optgroup>';
+t+='<optgroup label="PLUMBING"><option>Plumbing First Fix</option><option>Plumbing Second Fix</option><option>Drainage</option><option>Pressure Testing</option></optgroup>';
+t+='<optgroup label="ELECTRICAL"><option>Electrical First Fix</option><option>Electrical Second Fix</option><option>DB & Termination</option><option>Testing</option></optgroup>';
+t+='<optgroup label="FINISHES"><option>Plastering</option><option>Rendering</option><option>Floor Screeding</option><option>Wall Tiling</option><option>Floor Tiling</option><option>Painting</option></optgroup>';
+t+='<optgroup label="JOINERY"><option>Ceiling</option><option>Door Frames</option><option>Door Leaves</option><option>Windows</option><option>Skirting & Architrave</option></optgroup>';
+t+='<optgroup label="EXTERNAL"><option>Paving</option><option>Driveway</option><option>Boundary Wall</option><option>Fencing</option><option>Landscaping</option></optgroup>';
+t+='<optgroup label="GENERAL"><option>Site Cleaning</option><option>Material Offloading</option><option>Material Distribution</option><option>Material Carrying</option><option>Moving Materials in Congested Space</option><option>Carting Away Excavated Soil</option><option>Carting Away Debris</option><option>Carting Away Waste</option><option>Manual Excavation</option><option>Loading into Truck</option><option>Offloading from Truck</option><option>Scaffolding</option><option>Formwork Assembly</option><option>Steel Fixing</option><option>Concreting</option><option>Curing Works</option><option>Backfilling</option><option>Compaction Works</option><option>Demolition Support</option><option>Water Distribution</option><option>Dust Suppression</option><option>Traffic Control</option><option>Security Watch</option><option>Tool Maintenance</option><option>Site Setup Assistance</option><option>Lifting Assistance</option><option>Mortar Mixing</option><option>Brick/Block Carrying</option></optgroup>';
+return t;
+}
+function showWorkerForm(){
+var h='<h3>Register Worker</h3><label>Worker Name:</label><input id="_wName"><label>Trade:</label><select id="_wTrade"><option>Site Agent/Foreman</option><option>Masons</option><option>Carpenters</option><option>Steel Fixers</option><option>Plumbers</option><option>Electricians</option><option>Welders</option><option>Painters</option><option>Plasterers</option><option>Tilers</option><option>Scaffolders</option><option>Plant Operators</option><option>General Labourers</option><option>Unskilled Labourers</option><option>Other/Specialists</option></select><label>Company:</label><input id="_wCompany"><label>Phone:</label><input id="_wPhone" placeholder="07XX XXX XXX"><button class="btn" onclick="saveWorker()">Save Worker</button><button class="btn btn-secondary" onclick="go(\'labour\')">Cancel</button>';
 document.getElementById("content").innerHTML=h;
 }
-function saveLabour(){
-var d=document.getElementById("_entryDate").value;
-addItem("labour",{id:uid(),date:d,workerName:document.getElementById("_lname").value,trade:document.getElementById("_ltrade").value,company:document.getElementById("_lcomp").value,hours:document.getElementById("_lhours").value,status:document.getElementById("_lstatus").value,task:document.getElementById("_ltask").value,mainCount:1,subCount:0});
-toast("Worker added!");go("labour");
-}
+function saveWorker(){if(!D.workers)D.workers=[];D.workers.push({id:uid(),name:document.getElementById("_wName").value,trade:document.getElementById("_wTrade").value,company:document.getElementById("_wCompany").value,phone:document.getElementById("_wPhone").value});save();toast("Worker registered!");go("labour");}
+function removeWorker(id){D.workers=D.workers.filter(function(w){return w.id!==id;});if(D.attendance)D.attendance=D.attendance.filter(function(a){return a.workerId!==id;});save();toast("Worker removed");go("labour");}
+function toggleAttendance(workerId){if(!D.attendance)D.attendance=[];var existing=D.attendance.filter(function(a){return a.workerId===workerId&&a.date===globalDate;});if(existing.length>0){D.attendance=D.attendance.filter(function(a){return !(a.workerId===workerId&&a.date===globalDate);});}else{var w=D.workers.find(function(x){return x.id===workerId;});D.attendance.push({id:uid(),workerId:workerId,name:w?w.name:"",trade:w?w.trade:"",date:globalDate,status:"Present",task:"",timestamp:Date.now()});}save();go("labour");}
+function assignTask(workerId){var task=document.getElementById("_task_"+workerId).value;var att=D.attendance.find(function(a){return a.workerId===workerId&&a.date===globalDate;});if(att){att.task=task;save();toast("Task assigned!");}}
 RENDER["plant"]=function(){
 var list="";var plant=D.plant||[];
 if(plant.length===0){list='<p style="color:#666">No plant logged.</p>';}
@@ -1912,7 +1918,7 @@ var delays=(D.delays||[]).filter(function(e){return e.date===reportDate;});
 var logs=(D.materialLogs||[]).filter(function(e){return e.date===reportDate;});
 var mats=logs.filter(function(e){return e.type==="delivery";});
 var used=logs.filter(function(e){return e.type==="usage";});
-var lab=(D.labour||[]).filter(function(e){return e.date===reportDate;});
+var lab=(D.attendance||[]).filter(function(e){return e.date===reportDate;});
 var plant=D.plant||[];
 var meets=(D.meetings||[]).filter(function(e){return e.date===reportDate;});
 var isToday=reportDate===today();
@@ -2021,9 +2027,10 @@ return '<div style="background:#2C2C2E;border-radius:8px;padding:8px;margin-bott
 };
 
 function saveReport(){if(!D.savedReports)D.savedReports=[];D.savedReports.push({id:uid(),date:reportDate,timestamp:Date.now()});save();toast("Report saved!");go("report");}
-function printReport(){var c=document.getElementById("rp").innerHTML;var w=window.open("","_blank","width=900,height=700");w.document.write('<!DOCTYPE html><html><head><title>Daily Site Report</title><style>body{font-family:monospace;font-size:10px;line-height:1.4;padding:15px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px}hr{border:1px solid #000}h3{text-align:center;font-size:13px}h4{font-size:11px;margin:6px 0}@media print{body{margin:0;padding:8px}}</style></head><body>'+c+'</body></html>');w.document.close();setTimeout(function(){w.print();},500);}
-function shareWhatsApp(){var c=document.getElementById("rp").innerText;var text="CLERK OF WORKS - DAILY SITE REPORT\n\n"+c.substring(0,500)+"...\n\nGenerated by Construction Manager";var url="https://wa.me/?text="+encodeURIComponent(text);window.open(url,"_blank");}
-function shareEmail(){var c=document.getElementById("rp").innerText;var subject="Daily Site Report - "+reportDate;var body=c.substring(0,1000)+"...\n\nGenerated by Construction Manager";var url="mailto:?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);window.open(url,"_blank");}
+function printReport(){if(typeof Android!=="undefined"&&Android.printReport){Android.printReport();}else{var c=document.getElementById("rp").innerHTML;var w=window.open("","_blank","width=900,height=700");w.document.write('<!DOCTYPE html><html><head><title>Daily Site Report</title><style>body{font-family:monospace;font-size:10px;line-height:1.4;padding:15px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px}hr{border:1px solid #000}h3{text-align:center;font-size:13px}h4{font-size:11px;margin:6px 0}@media print{body{margin:0;padding:8px}}</style></head><body>'+c+'</body></html>');w.document.close();setTimeout(function(){w.print();},500);}}
+function shareWhatsApp(){var c=document.getElementById("rp").innerHTML;var fullText=document.getElementById("rp").innerText;var fileName="Daily_Report_"+reportDate+".html";var fullHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Daily Site Report</title><style>body{font-family:monospace;font-size:12px;line-height:1.5;color:#000;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:5px}hr{border:1px solid #000}h3{text-align:center}@media print{body{margin:0;padding:10px}}</style></head><body>'+c+'</body></html>';if(typeof Android!=="undefined"&&Android.shareWhatsAppPdf){Android.shareWhatsAppPdf(fullHtml,fileName);}else{var url="https://wa.me/?text="+encodeURIComponent(fullText);window.open(url,"_blank");}}
+function shareWhatsApp(){var c=document.getElementById("rp").innerHTML;var fullHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Daily Site Report</title><style>body{font-family:monospace;font-size:12px;line-height:1.5;color:#000;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:5px}hr{border:1px solid #000}h3{text-align:center}@media print{body{margin:0;padding:10px}}</style></head><body>'+c+'</body></html>';var fileName="Daily_Report_"+reportDate+".html";if(typeof Android!=="undefined"&&Android.shareWhatsAppPdf){Android.shareWhatsAppPdf(fullHtml,fileName);}else{var text=document.getElementById("rp").innerText;var url="https://wa.me/?text="+encodeURIComponent(text.substring(0,500));window.open(url,"_blank");}}
+function shareEmail(){var c=document.getElementById("rp").innerText;var subject="Daily Site Report - "+reportDate;var body=c.substring(0,2000)+"...\n\nGenerated by Construction Manager";var url="mailto:?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);window.open(url,"_blank");}
 // ============ SETTINGS ============
 // ============ KENYAN WEATHER SERVICE ============
 function getKenyanWeather(){
