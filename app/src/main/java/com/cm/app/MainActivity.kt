@@ -93,6 +93,49 @@ class MainActivity : ComponentActivity() {
         }
     }
     
+    private fun shareViaWhatsApp(text: String) {
+        try {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+                setPackage("com.whatsapp")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                startActivity(Intent.createChooser(intent, "Share Report"))
+            } catch (e2: Exception) {
+                android.widget.Toast.makeText(this, "No sharing app available", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun shareReportViaWhatsApp(text: String) {
+        try {
+            val pdfDir = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "Reports")
+            pdfDir.mkdirs()
+            val pdfFile = File(pdfDir, "Daily_Report_${System.currentTimeMillis()}.pdf")
+            pdfFile.writeText(text)
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", pdfFile)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, text)
+                setPackage("com.whatsapp")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback to text-only
+            shareViaWhatsApp(text)
+        }
+    }
+
     private fun shareFile(context: Context, file: File, mimeType: String) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -106,6 +149,20 @@ class MainActivity : ComponentActivity() {
     }
     
     inner class WebAppInterface(private val context: Context, private val webView: WebView) {
+        @android.webkit.JavascriptInterface
+        fun shareViaWhatsApp(text: String) {
+            runOnUiThread {
+                this@MainActivity.shareViaWhatsApp(text)
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun shareReportViaWhatsApp(text: String) {
+            runOnUiThread {
+                this@MainActivity.shareReportViaWhatsApp(text)
+            }
+        }
+
         @android.webkit.JavascriptInterface
         fun shareAsPdf(reportHtml: String, fileName: String) {
             try {
