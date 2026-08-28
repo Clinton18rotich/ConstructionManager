@@ -320,7 +320,7 @@ var nc=(D.ncrs||[]).filter(function(e){return e.status==="open";});
 var lab=(D.attendance||[]).filter(function(e){return e.date===globalDate;});
 var pa=(D.plant||[]).filter(function(e){return e.status==="Active";});
 var del=(D.delays||[]).filter(function(e){return e.date===globalDate;});
-var tl=0;for(var i=0;i<lab.length;i++){tl+=parseInt(lab[i].mainCount||0)+parseInt(lab[i].subCount||0);}
+var tl=(D.attendance||[]).filter(function(a){return a.date===globalDate;}).length;
 var ip=0,it=0;for(var i=0;i<insp.length;i++){for(var j=0;j<insp[i].items.length;j++){it++;if(insp[i].items[j].pass)ip++;}}
 var ds2=new Date(globalDate).toLocaleDateString("en-KE",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 return '<div style="text-align:center;padding:10px 0"><h2 style="color:#ff9f0a;font-size:22px;margin:0">CONSTRUCTION MANAGER</h2><p style="color:#aaa;font-size:13px">'+ds2+'</p></div>'+
@@ -435,9 +435,9 @@ RENDER["stock"]=function(){
 var list="";var stock=D.stock||[];
 var toolCats=["Tools & Site Equipment"];var low=stock.filter(function(e){return e.qty<=e.minStock&&toolCats.indexOf(e.category)===-1;});
 if(low.length>0){list+='<div class="card" style="background:#331111;border:1px solid #ff3b30"><h4 style="color:#ff3b30">LOW STOCK ALERTS</h4>';for(var i=0;i<low.length;i++){list+='<p style="color:#ff3b30">'+low[i].name+': '+low[i].qty+' '+low[i].unit+' left (Min: '+low[i].minStock+')</p>';}list+='</div>';}
-list+='<table><tr><th>Material</th><th>Category</th><th>Qty</th><th>Unit</th><th>Status</th></tr>';
-if(stock.length===0){list+='<tr><td colspan="5">No stock. Log deliveries to build inventory.</td></tr>';}
-else{for(var i=0;i<stock.length;i++){var s=stock[i];var isTool=toolCats.indexOf(s.category)!==-1;var st=isTool?"TOOL":s.qty<=s.minStock?"LOW":s.qty<=s.minStock*2?"OK":"GOOD";var sc=isTool?"tag-open":s.qty<=s.minStock?"tag-fail":s.qty<=s.minStock*2?"tag-open":"tag-pass";list+='<tr><td>'+s.name+'</td><td>'+s.category+'</td><td>'+s.qty+'</td><td>'+s.unit+'</td><td><span class="tag '+sc+'">'+st+'</span></td></tr>';}}
+list+='<table><tr><th>Material</th><th>Category</th><th>Qty</th><th>Unit</th><th>Last Delivery</th><th>Status</th></tr>';
+if(stock.length===0){list+='<tr><td colspan="6">No stock. Log deliveries to build inventory.</td></tr>';}
+else{for(var i=0;i<stock.length;i++){var s=stock[i];var isTool=toolCats.indexOf(s.category)!==-1;var st=isTool?"TOOL":s.qty<=s.minStock?"LOW":s.qty<=s.minStock*2?"OK":"GOOD";var sc=isTool?"tag-open":s.qty<=s.minStock?"tag-fail":s.qty<=s.minStock*2?"tag-open":"tag-pass";var lastDel="—";var delLogs=(D.materialLogs||[]).filter(function(l){return l.type==="delivery"&&l.name===s.name&&l.unit===s.unit;});if(delLogs.length>0){delLogs.sort(function(a,b){return new Date(b.date)-new Date(a.date);});lastDel=delLogs[0].date;}list+='<tr><td>'+s.name+'</td><td>'+s.category+'</td><td>'+s.qty+'</td><td>'+s.unit+'</td><td>'+lastDel+'</td><td><span class="tag '+sc+'">'+st+'</span></td></tr>';}}
 list+='</table>';
 return '<h2>Stock / Inventory</h2>'+list+'<br><button class="btn btn-sm btn-blue" onclick="rebuildStock();go(\'stock\')">Recalculate Stock</button>';
 };
