@@ -103,7 +103,7 @@ function autoDiary(activity,location,details,entryDate){
 if(!D.diaries)D.diaries=[];
 D.diaries.push({id:uid(),date:entryDate||globalDate,time:new Date().toLocaleTimeString(),activity:activity,location:location||"",labour:"0",equipment:"",obs:details||"",remarks:""});
 }
-function delItem(arr,id){D[arr]=D[arr].filter(function(i){return i.id!==id;});save();}
+function delItem(arr,id){var item=(D[arr]||[]).find(function(i){return i.id===id;});if(item&&arr==="materialLogs"){if(!D.stock)D.stock=[];var en=item.name;var eq=parseFloat(item.qty)||0;var found=false;for(var i=0;i<D.stock.length;i++){if(D.stock[i].name===en){if(item.type==="delivery"){D.stock[i].qty-=eq;if(D.stock[i].qty<0)D.stock[i].qty=0;}else{D.stock[i].qty+=eq;}found=true;break;}}if(found){toast("Stock restored!");}}D[arr]=D[arr].filter(function(i){return i.id!==id;});save();}
 
 // ============ CATALOGS ============
 var WORK_ITEMS=[
