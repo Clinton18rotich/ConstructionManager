@@ -297,7 +297,7 @@ var MEETING_AGENDA=["Confirmation of Previous Minutes","Progress Review","Qualit
 var CONCRETE_MIXES={"C15/20 Blinding":{"ratio":"1:3:6","cement":"250kg (5 bags)","sand":"0.45m3","ballast":"0.9m3","water":"125L","use":"Blinding, lean concrete"},"C20/25 Light Duty":{"ratio":"1:2.5:5","cement":"300kg (6 bags)","sand":"0.44m3","ballast":"0.88m3","water":"150L","use":"Light duty floors"},"C25/30 General RC":{"ratio":"1:2:4","cement":"350kg (7 bags)","sand":"0.42m3","ballast":"0.84m3","water":"175L","use":"Slabs, beams, columns"},"C30/37 Heavy Duty":{"ratio":"1:2:3","cement":"400kg (8 bags)","sand":"0.40m3","ballast":"0.80m3","water":"200L","use":"Heavy duty, water retaining"},"C35/45 Precast":{"ratio":"1:1.5:3","cement":"450kg (9 bags)","sand":"0.38m3","ballast":"0.76m3","water":"200L","use":"Precast elements"},"C40/50 High Strength":{"ratio":"1:1.5:2.5","cement":"500kg (10 bags)","sand":"0.36m3","ballast":"0.72m3","water":"200L","use":"Bridge works"}};
 
 // ============ NAVIGATION ============
-var NAV=[{id:"dashboard",label:"Home"},{id:"diary",label:"Diary"},{id:"inspections",label:"Inspections"},{id:"ncr",label:"NCRs"},{id:"instructions",label:"S.I."},{id:"materials",label:"Materials"},{id:"stock",label:"Stock"},{id:"mir",label:"MIR"},{id:"cubes",label:"Cubes"},{id:"defects",label:"Defects"},{id:"concrete",label:"Concrete"},{id:"labour",label:"Labour"},{id:"plant",label:"Plant"},{id:"plantinstall",label:"Plant Install"},{id:"formwork",label:"Formwork"},{id:"bbs",label:"BBS"},{id:"underground",label:"Underground"},{id:"roof",label:"Roof"},{id:"landscape",label:"Landscape"},{id:"transport",label:"Transport"},{id:"heavy",label:"Heavy Civil"},{id:"marine",label:"Marine"},{id:"runway",label:"Runway"},{id:"bridges",label:"Bridges"},{id:"pipeline",label:"Pipeline"},{id:"geotech",label:"Geotech"},{id:"irrigation",label:"Irrigation"},{id:"traffic",label:"Traffic"},{id:"surveying",label:"Survey"},{id:"powerline",label:"Power Line"},{id:"slope",label:"Slope"},{id:"masonry",label:"Masonry"},{id:"staircase",label:"Staircase"},{id:"upperfloor",label:"Upper Floor"},{id:"finishes",label:"Finishes"},{id:"interior",label:"Interior"},{id:"fixtures",label:"Fixtures"},{id:"openings",label:"Openings"},{id:"plumbing",label:"Plumbing"},{id:"electrical",label:"Electrical"},{id:"meetings",label:"Meetings"},{id:"delays",label:"Delays"},{id:"drawings",label:"Drawings"},{id:"rfi",label:"RFIs"},{id:"stopwork",label:"Stop Work"},{id:"rejections",label:"MRN"},{id:"report",label:"REPORT"},{id:"project",label:"Settings"}];
+var NAV=[{id:"dashboard",label:"Home"},{id:"diary",label:"Diary"},{id:"inspections",label:"Inspections"},{id:"ncr",label:"NCRs"},{id:"instructions",label:"S.I."},{id:"materials",label:"Materials"},{id:"stock",label:"Stock"},{id:"mir",label:"MIR"},{id:"cubes",label:"Cubes"},{id:"defects",label:"Defects"},{id:"concrete",label:"Concrete"},{id:"labour",label:"Labour"},{id:"store",label:"Tool Store"},{id:"plant",label:"Plant"},{id:"plantinstall",label:"Plant Install"},{id:"formwork",label:"Formwork"},{id:"bbs",label:"BBS"},{id:"underground",label:"Underground"},{id:"roof",label:"Roof"},{id:"landscape",label:"Landscape"},{id:"transport",label:"Transport"},{id:"heavy",label:"Heavy Civil"},{id:"marine",label:"Marine"},{id:"runway",label:"Runway"},{id:"bridges",label:"Bridges"},{id:"pipeline",label:"Pipeline"},{id:"geotech",label:"Geotech"},{id:"irrigation",label:"Irrigation"},{id:"traffic",label:"Traffic"},{id:"surveying",label:"Survey"},{id:"powerline",label:"Power Line"},{id:"slope",label:"Slope"},{id:"masonry",label:"Masonry"},{id:"staircase",label:"Staircase"},{id:"upperfloor",label:"Upper Floor"},{id:"finishes",label:"Finishes"},{id:"interior",label:"Interior"},{id:"fixtures",label:"Fixtures"},{id:"openings",label:"Openings"},{id:"plumbing",label:"Plumbing"},{id:"electrical",label:"Electrical"},{id:"meetings",label:"Meetings"},{id:"delays",label:"Delays"},{id:"drawings",label:"Drawings"},{id:"rfi",label:"RFIs"},{id:"stopwork",label:"Stop Work"},{id:"rejections",label:"MRN"},{id:"report",label:"REPORT"},{id:"project",label:"Settings"}];
 var current="dashboard";
 function nav(){
 var h="";for(var i=0;i<NAV.length;i++){h+='<button class="'+(NAV[i].id===current?"active":"")+'" onclick="go(\''+NAV[i].id+'\')">'+NAV[i].label+'</button>';}
@@ -531,6 +531,103 @@ var bags=Math.ceil((vol*parseFloat(mx.cement)||0)/50);
 D.concretePours.push({id:uid(),date:document.getElementById("_entryDate").value,category:document.getElementById("_cpCat").value,element:document.getElementById("_cpLoc").value,grade:grade,volume:vol.toFixed(2),cementBags:bags,status:document.getElementById("_cpStatus").value,notes:document.getElementById("_cpNotes").value,timestamp:Date.now()});
 save();toast("Pour saved!");go("concrete");
 }
+RENDER["store"]=function(){
+var h='<h2>Tool Store Register</h2><p style="color:#aaa;font-size:12px">Check out tools - return at end of day</p>';
+var toolCats=["Tools & Site Equipment","Tools - Hand","Tools - Power & Safety"];
+var tools=(D.stock||[]).filter(function(s){return toolCats.indexOf(s.category)!==-1;});
+if(tools.length===0){h+='<p style="color:#666">No tools in stock. Log deliveries of tools first.</p>';}
+else{
+var checkedOut=(D.toolLog||[]).filter(function(t){return t.status==="out";});
+h+='<div class="card" style="background:#1a1a2e"><div style="font-size:24px;color:#ff9f0a">'+checkedOut.length+'</div><small>Tools Currently Out</small></div>';
+h+='<table style="font-size:11px"><tr><th>Tool</th><th>Qty in Store</th><th>Status</th><th>Action</th></tr>';
+for(var i=0;i<tools.length;i++){var t=tools[i];
+var outCount=0;for(var j=0;j<checkedOut.length;j++){if(checkedOut[j].toolName===t.name)outCount+=parseInt(checkedOut[j].qty||1);}
+var avail=t.qty-outCount;
+h+='<tr><td>'+t.name+'</td><td>'+avail+' / '+t.qty+'</td><td><span class="tag '+(outCount>0?"tag-open":"tag-pass")+'">'+(outCount>0?outCount+" OUT":"In Store")+'</span></td><td>';
+if(avail>0){h+='<button class="btn btn-sm" style="padding:2px 6px;font-size:9px;background:#ff9f0a;color:#000" onclick="checkoutTool(\''+t.name+'\')">Take Out</button>';}
+h+='</td></tr>';}
+h+='</table>';
+}
+h+='<h4 style="margin-top:15px">Currently Checked Out</h4>';
+var outList=(D.toolLog||[]).filter(function(t){return t.status==="out";});
+if(outList.length===0){h+='<p style="color:#666">No tools checked out.</p>';}
+else{h+='<table style="font-size:10px"><tr><th>Tool</th><th>Qty</th><th>Taken By</th><th>Time Out</th><th></th></tr>';
+for(var i=0;i<outList.length;i++){var t=outList[i];
+h+='<tr><td>'+t.toolName+'</td><td>'+t.qty+'</td><td>'+t.takenBy+'</td><td>'+t.timeOut+'</td><td><button class="btn btn-green btn-sm" style="padding:2px 6px;font-size:9px" onclick="returnTool(\''+t.id+'\')">Return</button></td></tr>';}
+h+='</table>';}
+var consumableCats=["Hardware & Consumables","Hardware & Ironmongery","Paint & Finishes"];
+var consumables=(D.stock||[]).filter(function(s){return consumableCats.indexOf(s.category)!==-1;});
+if(consumables.length>0){
+h+='<h4 style="margin-top:15px">Consumables (Used Up - Not Returned)</h4>';
+h+='<table style="font-size:10px"><tr><th>Item</th><th>Qty in Stock</th><th>Min Stock</th><th>Status</th><th>Issue/Return</th></tr>';
+for(var i=0;i<consumables.length;i++){var c=consumables[i];
+var st=c.qty<=c.minStock?"LOW":c.qty<=c.minStock*2?"OK":"GOOD";
+var sc=c.qty<=c.minStock?"tag-fail":c.qty<=c.minStock*2?"tag-open":"tag-pass";
+var issuedQty=0;var issuedItems=(D.consumableLog||[]).filter(function(l){return l.name===c.name&&l.status==="out";});
+for(var j=0;j<issuedItems.length;j++){issuedQty+=parseFloat(issuedItems[j].qty||0);}
+h+='<tr><td>'+c.name+'</td><td>'+c.qty+' '+c.unit+'</td><td>'+c.minStock+'</td><td><span class="tag '+sc+'">'+st+'</span></td><td>';
+h+='<button class="btn btn-sm" style="padding:2px 6px;font-size:8px;background:#ff9f0a;color:#000" onclick="issueConsumable(\''+c.name+'\')">Issue</button> ';
+if(issuedQty>0){h+='<span style="color:#ff9f0a;font-size:9px">'+issuedQty+' out</span>';}
+h+='</td></tr>';}
+h+='</table>';
+h+='<h4 style="margin-top:10px">Issued Consumables (Not Yet Returned)</h4>';
+var issuedList=(D.consumableLog||[]).filter(function(l){return l.status==="out";});
+if(issuedList.length===0){h+='<p style="color:#666">No consumables issued.</p>';}
+else{h+='<table style="font-size:10px"><tr><th>Item</th><th>Qty</th><th>Issued To</th><th>Time Out</th><th></th></tr>';
+for(var i=0;i<issuedList.length;i++){var l=issuedList[i];
+h+='<tr><td>'+l.name+'</td><td>'+l.qty+'</td><td>'+l.issuedTo+'</td><td>'+l.timeOut+'</td><td><button class="btn btn-green btn-sm" style="padding:2px 6px;font-size:8px" onclick="returnConsumable(\''+l.id+'\')">Return to Store</button></td></tr>';}
+h+='</table>';}
+}
+h+='<h4 style="margin-top:15px">Today History</h4>';
+var todayLog=(D.toolLog||[]).filter(function(t){return t.date===globalDate;});
+var todayCons=(D.consumableLog||[]).filter(function(l){return l.date===globalDate;});
+if(todayLog.length===0&&todayCons.length===0){h+='<p style="color:#666">No store activity today.</p>';}
+else{
+if(todayLog.length>0){h+='<h5 style="color:#ff9f0a">Tools</h5><table style="font-size:9px"><tr><th>Tool</th><th>By</th><th>Out</th><th>In</th><th>Status</th></tr>';
+for(var i=0;i<todayLog.length;i++){var t=todayLog[i];
+h+='<tr><td>'+t.toolName+'</td><td>'+t.takenBy+'</td><td>'+t.timeOut+'</td><td>'+(t.timeIn||"—")+'</td><td><span class="tag '+(t.status==="out"?"tag-open":"tag-pass")+'">'+(t.status==="out"?"OUT":"Returned")+'</span></td></tr>';}
+h+='</table>';}
+if(todayCons.length>0){h+='<h5 style="color:#ff9f0a">Consumables</h5><table style="font-size:9px"><tr><th>Item</th><th>Qty</th><th>By</th><th>Out</th><th>In</th><th>Status</th></tr>';
+for(var i=0;i<todayCons.length;i++){var l=todayCons[i];
+h+='<tr><td>'+l.name+'</td><td>'+l.qty+'</td><td>'+l.issuedTo+'</td><td>'+l.timeOut+'</td><td>'+(l.timeIn||"—")+'</td><td><span class="tag '+(l.status==="out"?"tag-open":"tag-pass")+'">'+(l.status==="out"?"OUT":"Returned")+'</span></td></tr>';}
+h+='</table>';}
+}
+h+='<h4 style="margin-top:15px">Damaged/Lost Tools</h4>';
+h+='<button class="btn btn-sm btn-red" style="padding:4px 8px;font-size:10px" onclick="showDamageForm()">+ Report Damaged/Lost Tool</button>';
+var damaged=(D.toolLog||[]).filter(function(t){return t.status==="damaged"||t.status==="lost";});
+if(damaged.length>0){h+='<table style="font-size:9px;margin-top:5px"><tr><th>Tool</th><th>Status</th><th>Reported By</th><th>Date</th></tr>';
+for(var i=0;i<damaged.length;i++){var d=damaged[i];
+h+='<tr><td>'+d.toolName+'</td><td><span class="tag tag-fail">'+d.status.toUpperCase()+'</span></td><td>'+d.takenBy+'</td><td>'+d.date+'</td></tr>';}
+h+='</table>';}
+return h;};
+
+function checkoutTool(toolName){
+var h='<h3>Check Out Tool</h3><label>Tool:</label><input id="_ctTool" value="'+toolName+'" readonly><div class="row"><div><label>Quantity:</label><input id="_ctQty" type="number" value="1"></div><div><label>Taken By:</label><select id="_ctBy">';
+var workers=(D.workers||[]);for(var i=0;i<workers.length;i++){h+='<option>'+workers[i].name+'</option>';}
+h+='</select></div></div><button class="btn" onclick="saveCheckout()">Check Out</button><button class="btn btn-secondary" onclick="go(\'store\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveCheckout(){if(!D.toolLog)D.toolLog=[];D.toolLog.push({id:uid(),toolName:document.getElementById("_ctTool").value,qty:document.getElementById("_ctQty").value,takenBy:document.getElementById("_ctBy").value,date:globalDate,timeOut:new Date().toLocaleTimeString(),timeIn:"",status:"out",timestamp:Date.now()});save();toast("Tool checked out!");go("store");}
+function returnTool(id){var t=(D.toolLog||[]).find(function(x){return x.id===id;});if(t){t.status="returned";t.timeIn=new Date().toLocaleTimeString();save();toast("Tool returned!");go("store");}}
+function issueConsumable(itemName){
+var h='<h3>Issue Consumable</h3><label>Item:</label><input id="_ciItem" value="'+itemName+'" readonly><div class="row"><div><label>Quantity:</label><input id="_ciQty" type="number" value="1"></div><div><label>Issued To:</label><select id="_ciTo">';
+var workers=(D.workers||[]);for(var i=0;i<workers.length;i++){h+='<option>'+workers[i].name+'</option>';}
+h+='</select></div></div><button class="btn" onclick="saveIssue()">Issue</button><button class="btn btn-secondary" onclick="go(\'store\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveIssue(){if(!D.consumableLog)D.consumableLog=[];var name=document.getElementById("_ciItem").value;var qty=parseFloat(document.getElementById("_ciQty").value)||0;D.consumableLog.push({id:uid(),name:name,qty:qty,issuedTo:document.getElementById("_ciTo").value,date:globalDate,timeOut:new Date().toLocaleTimeString(),timeIn:"",status:"out",timestamp:Date.now()});save();toast("Consumable issued!");go("store");}
+function returnConsumable(id){var l=(D.consumableLog||[]).find(function(x){return x.id===id;});if(l){l.status="returned";l.timeIn=new Date().toLocaleTimeString();save();toast("Consumable returned to store!");go("store");}}
+function showDamageForm(){
+var h='<h3>Report Damaged/Lost Tool</h3><label>Tool:</label><select id="_dmTool">';
+var toolCats=["Tools & Site Equipment","Tools - Hand","Tools - Power & Safety"];
+var tools=(D.stock||[]).filter(function(s){return toolCats.indexOf(s.category)!==-1;});
+for(var i=0;i<tools.length;i++){h+='<option>'+tools[i].name+'</option>';}
+h+='</select><label>Status:</label><select id="_dmStatus"><option>Damaged</option><option>Lost</option></select><label>Reported By:</label><select id="_dmBy">';
+var workers=(D.workers||[]);for(var i=0;i<workers.length;i++){h+='<option>'+workers[i].name+'</option>';}
+h+='</select><label>Notes:</label><input id="_dmNotes"><button class="btn btn-red" onclick="saveDamage()">Report</button><button class="btn btn-secondary" onclick="go(\'store\')">Cancel</button>';
+document.getElementById("content").innerHTML=h;
+}
+function saveDamage(){if(!D.toolLog)D.toolLog=[];D.toolLog.push({id:uid(),toolName:document.getElementById("_dmTool").value,qty:1,takenBy:document.getElementById("_dmBy").value,date:globalDate,timeOut:"",timeIn:"",status:document.getElementById("_dmStatus").value,notes:document.getElementById("_dmNotes").value,timestamp:Date.now()});save();toast("Tool reported!");go("store");}
 RENDER["labour"]=function(){
 var h='<h2>Workers Register</h2><p style="color:#aaa;font-size:12px">Register workers once - tick attendance daily</p>';
 var workers=(D.workers||[]);
