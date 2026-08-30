@@ -747,7 +747,7 @@ function rdate(){return new Date(reportDate).toLocaleDateString("en-KE",{weekday
 // ============ DRAWINGS REGISTER ============
 RENDER["drawings"]=function(){
 var h='<h2>Drawings Register</h2><p style="color:#aaa;font-size:12px">Upload plans, grid checklist, photo markup</p>';
-h+='<div style="display:flex;gap:8px;margin:10px 0"><button class="btn btn-blue btn-sm" onclick="showDrawingForm()">+ Add Drawing</button></div>';
+h+='<div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><button class="btn btn-blue btn-sm" onclick="showDrawingForm()">+ Add Drawing</button> <button class="btn btn-green btn-sm" onclick="showColumnAnalyzer()">Column Analyzer</button> <button class="btn btn-green btn-sm" onclick="showFootingAnalyzer()">Footing Analyzer</button> <button class="btn btn-green btn-sm" onclick="showBeamAnalyzer()">Beam Analyzer</button> <button class="btn btn-green btn-sm" onclick="showStairAnalyzer()">Stair Analyzer</button> <button class="btn btn-green btn-sm" onclick="showSlabAnalyzer()">Slab Analyzer</button></div>';
 var drawings=D.drawings||[];
 if(drawings.length===0){h+='<p style="color:#666">No drawings registered.</p>';}
 else{
@@ -793,6 +793,265 @@ var reader=new FileReader();
 reader.onload=function(e){document.getElementById("dwgFileData").value=e.target.result;toast("File ready!");};
 reader.readAsDataURL(file);
 }else{toast("File too large (max 15MB)");}
+}
+function showColumnAnalyzer(){
+var h='<h3>Column Reinforcement Analyzer</h3>';
+h+='<div class="card"><label>Column Ref:</label><input id="_colRef" placeholder="e.g. C1, C2"><div class="row"><div><label>Column Width (mm):</label><input id="_colW" type="number" value="230"></div><div><label>Column Depth (mm):</label><input id="_colD" type="number" value="230"></div></div><div class="row"><div><label>Column Height (mm):</label><input id="_colH" type="number" value="3000"></div><div><label>Main Bars Size:</label><select id="_colMainBar"><option>Y10</option><option>Y12</option><option>Y16</option><option>Y20</option><option>Y25</option></select></div></div><label>Number of Main Bars:</label><input id="_colMainCount" type="number" value="4"><div class="row"><div><label>Stirrup Size:</label><select id="_colStirrup"><option>R6</option><option>R8</option><option>R10</option></select></div><div><label>Stirrup Spacing (mm):</label><input id="_colStirrupSpacing" type="number" value="200"></div></div><label>Cover (mm):</label><input id="_colCover" type="number" value="25"><button class="btn" onclick="analyzeColumn()">Analyze</button></div>';
+h+='<div id="_colResult"></div>';
+document.getElementById("content").innerHTML=h;
+}
+function analyzeColumn(){
+var ref=document.getElementById("_colRef").value||"C";
+var w=parseFloat(document.getElementById("_colW").value)||230;
+var d=parseFloat(document.getElementById("_colD").value)||230;
+var h=parseFloat(document.getElementById("_colH").value)||3000;
+var mainBar=document.getElementById("_colMainBar").value;
+var mainCount=parseInt(document.getElementById("_colMainCount").value)||4;
+var stirrup=document.getElementById("_colStirrup").value;
+var spacing=parseFloat(document.getElementById("_colStirrupSpacing").value)||200;
+var cover=parseFloat(document.getElementById("_colCover").value)||25;
+var barWt={"Y10":0.617,"Y12":0.888,"Y16":1.579,"Y20":2.466,"Y25":3.854};
+var stirWt={"R6":0.222,"R8":0.395,"R10":0.617};
+var mainWt=barWt[mainBar]||0.888;
+var stirWtPerM=stirWt[stirrup]||0.222;
+var mainLen=h+((w+d)*2)*0.001;
+var mainTotal=mainCount*mainLen;
+var mainKg=mainTotal*mainWt;
+var hookAllowance=(stirrup=="R10")?200:150;var stirrupPerimeter=((w-2*cover)+(d-2*cover))*2+hookAllowance;
+var stirrupCount=Math.ceil(h/spacing)+1;
+var stirrupTotal=stirrupCount*stirrupPerimeter/1000;
+var stirrupKg=stirrupTotal*stirWtPerM;
+var totalKg=mainKg+stirrupKg;
+var html='<div class="card" style="background:#1a1a2e;margin-top:10px"><h4>Column '+ref+' Analysis</h4>';
+html+='<p>Main Bars: '+mainCount+' x '+mainBar+' @ '+mainLen.toFixed(2)+'m = '+mainKg.toFixed(1)+' kg</p>';
+html+='<p>Stirrups: '+stirrup+' @ '+spacing+'mm c/c | Number: '+stirrupCount+' | Total: '+stirrupTotal.toFixed(2)+'m = '+stirrupKg.toFixed(1)+' kg</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL STEEL: '+totalKg.toFixed(1)+' kg</h4>';
+var mainBars12m=Math.ceil(mainTotal/12);
+var stirrupBars12m=Math.ceil(stirrupTotal/12);
+html+='<h4 style="color:#30d158">12m BARS NEEDED:</h4>';
+html+='<p style="font-size:11px"><b>'+mainBars12m+' x 12m '+mainBar+'</b> (Main bars: '+mainCount+' x '+mainLen.toFixed(2)+'m = '+mainTotal.toFixed(1)+'m)</p>';
+html+='<p style="font-size:11px"><b>'+stirrupBars12m+' x 12m '+stirrup+'</b> (Stirrups: '+stirrupCount+' x '+stirrupPerimeter+'mm = '+stirrupTotal.toFixed(1)+'m)</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL: '+mainBars12m+' x '+mainBar+' + '+stirrupBars12m+' x '+stirrup+'</h4>';
+html+='<p style="font-size:10px;color:#aaa">Inspection: '+mainCount+'x'+mainBar+' main bars, '+stirrup+' @ '+spacing+'mm c/c, cover '+cover+'mm</p>';
+html+='<button class="btn btn-sm btn-green" onclick="saveStructureAnalysis(\''+ref+'\',\'Column\','+totalKg.toFixed(1)+')">Save</button></div>';
+document.getElementById("_colResult").innerHTML=html;
+}
+function showFootingAnalyzer(){
+var h='<h3>Footing Reinforcement Analyzer</h3>';
+h+='<div class="card"><label>Footing Ref:</label><input id="_ftRef" placeholder="e.g. F1"><div class="row"><div><label>Length (mm):</label><input id="_ftL" type="number" value="1200"></div><div><label>Width (mm):</label><input id="_ftW" type="number" value="1200"></div></div><div class="row"><div><label>Depth (mm):</label><input id="_ftD" type="number" value="300"></div><div><label>Bar Size:</label><select id="_ftBar"><option>Y10</option><option>Y12</option><option>Y16</option><option>Y20</option></select></div></div><div class="row"><div><label>Spacing (mm):</label><input id="_ftSpacing" type="number" value="200"></div><div><label>Cover (mm):</label><input id="_ftCover" type="number" value="50"></div></div><label>Number of same footings:</label><input id="_ftCount" type="number" value="1"><button class="btn" onclick="analyzeFooting()">Analyze</button></div>';
+h+='<div id="_ftResult"></div>';
+document.getElementById("content").innerHTML=h;
+}
+function analyzeFooting(){
+var ref=document.getElementById("_ftRef").value||"F";
+var L=parseFloat(document.getElementById("_ftL").value)||1200;
+var W=parseFloat(document.getElementById("_ftW").value)||1200;
+var cover=parseFloat(document.getElementById("_ftCover").value)||50;
+var bar=document.getElementById("_ftBar").value;
+var spacing=parseFloat(document.getElementById("_ftSpacing").value)||200;
+var count=parseInt(document.getElementById("_ftCount").value)||1;
+var barWt={"Y10":0.617,"Y12":0.888,"Y16":1.579,"Y20":2.466};
+var wt=barWt[bar]||0.888;
+var barLen=(L-2*cover)+100;
+var barsInL=Math.ceil((W-2*cover)/spacing)+1;
+var barsInW=Math.ceil((L-2*cover)/spacing)+1;
+var totalBars=barsInL+barsInW;
+var totalLen=totalBars*barLen/1000;
+var totalKg=totalLen*wt*count;
+var html='<div class="card" style="background:#1a1a2e;margin-top:10px"><h4>Footing '+ref+'</h4>';
+html+='<p>'+bar+' @ '+spacing+'mm | Bars L: '+barsInL+' | Bars W: '+barsInW+' | Total: '+totalBars+'</p>';
+html+='<p>Total Length: '+totalLen.toFixed(2)+'m</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL: '+totalKg.toFixed(1)+' kg</h4>';
+var bottomBars12m=Math.ceil(bottomTotal/12);
+var topBars12m=Math.ceil(topTotal/12);
+var stirrupBars12m=Math.ceil(stirrupTotal/12);
+html+='<h4 style="color:#30d158">12m BARS NEEDED:</h4>';
+html+='<p style="font-size:11px"><b>'+bottomBars12m+' x 12m '+bottomBar+'</b> (Bottom: '+bottomCount+' x '+bottomLen.toFixed(0)+'mm)</p>';
+html+='<p style="font-size:11px"><b>'+topBars12m+' x 12m '+topBar+'</b> (Top: '+topCount+' x '+topLen.toFixed(0)+'mm)</p>';
+html+='<p style="font-size:11px"><b>'+stirrupBars12m+' x 12m '+stirrup+'</b> (Stirrups: '+stirrupCount+' x '+stirrupPerimeter+'mm)</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL: '+bottomBars12m+' x '+bottomBar+' + '+topBars12m+' x '+topBar+' + '+stirrupBars12m+' x '+stirrup+'</h4>';
+html+='<p style="font-size:10px;color:#aaa">Inspection: '+bar+' @ '+spacing+'mm both ways, cover '+cover+'mm</p>';
+html+='<button class="btn btn-sm btn-green" onclick="saveStructureAnalysis(\''+ref+'\',\'Footing\','+totalKg.toFixed(1)+')">Save</button></div>';
+document.getElementById("_ftResult").innerHTML=html;
+}
+function showBeamAnalyzer(){
+var h='<h3>Beam Reinforcement Analyzer</h3>';
+h+='<div class="card"><label>Beam Ref:</label><input id="_bmRef" placeholder="e.g. B1"><div class="row"><div><label>Width (mm):</label><input id="_bmW" type="number" value="230"></div><div><label>Depth (mm):</label><input id="_bmD" type="number" value="450"></div></div><div class="row"><div><label>Span (mm):</label><input id="_bmSpan" type="number" value="4000"></div><div><label>Bottom Bars:</label><select id="_bmBottomBar"><option>Y12</option><option>Y16</option><option>Y20</option><option>Y25</option></select></div></div><label>No. of Bottom Bars:</label><input id="_bmBottomCount" type="number" value="3"><div class="row"><div><label>Top Bars:</label><select id="_bmTopBar"><option>Y12</option><option>Y16</option><option>Y20</option></select></div><div><label>No. of Top Bars:</label><input id="_bmTopCount" type="number" value="2"></div></div><div class="row"><div><label>Stirrup Size:</label><select id="_bmStirrup"><option>R6</option><option>R8</option><option>R10</option></select></div><div><label>Stirrup Spacing (mm):</label><input id="_bmStirrupSpacing" type="number" value="200"></div></div><label>Cover (mm):</label><input id="_bmCover" type="number" value="25"><button class="btn" onclick="analyzeBeam()">Analyze</button></div>';
+h+='<div id="_bmResult"></div>';
+document.getElementById("content").innerHTML=h;
+}
+function analyzeBeam(){
+var ref=document.getElementById("_bmRef").value||"B";
+var w=parseFloat(document.getElementById("_bmW").value)||230;
+var d=parseFloat(document.getElementById("_bmD").value)||450;
+var span=parseFloat(document.getElementById("_bmSpan").value)||4000;
+var bottomBar=document.getElementById("_bmBottomBar").value;
+var bottomCount=parseInt(document.getElementById("_bmBottomCount").value)||3;
+var topBar=document.getElementById("_bmTopBar").value;
+var topCount=parseInt(document.getElementById("_bmTopCount").value)||2;
+var stirrup=document.getElementById("_bmStirrup").value;
+var spacing=parseFloat(document.getElementById("_bmStirrupSpacing").value)||200;
+var cover=parseFloat(document.getElementById("_bmCover").value)||25;
+var barWt={"Y12":0.888,"Y16":1.579,"Y20":2.466,"Y25":3.854};
+var stirWt={"R6":0.222,"R8":0.395,"R10":0.617};
+var bottomWt=barWt[bottomBar]||1.579;
+var topWt=barWt[topBar]||0.888;
+var stirWtPerM=stirWt[stirrup]||0.395;
+var bottomLen=span+((w+d)*2)*0.001+200;
+var topLen=span+((w+d)*2)*0.001+200;
+var bottomTotal=bottomCount*bottomLen/1000;
+var topTotal=topCount*topLen/1000;
+var bottomKg=bottomTotal*bottomWt;
+var topKg=topTotal*topWt;
+var hookAllowance=(stirrup=="R10")?200:150;var stirrupPerimeter=((w-2*cover)+(d-2*cover))*2+hookAllowance;
+var stirrupCount=Math.ceil(span/spacing)+1;
+var stirrupTotal=stirrupCount*stirrupPerimeter/1000;
+var stirrupKg=stirrupTotal*stirWtPerM;
+var totalKg=bottomKg+topKg+stirrupKg;
+var html='<div class="card" style="background:#1a1a2e;margin-top:10px"><h4>Beam '+ref+'</h4>';
+html+='<p>Bottom: '+bottomCount+'x'+bottomBar+' = '+bottomKg.toFixed(1)+' kg</p>';
+html+='<p>Top: '+topCount+'x'+topBar+' = '+topKg.toFixed(1)+' kg</p>';
+html+='<p>Stirrups: '+stirrup+' @ '+spacing+'mm | Count: '+stirrupCount+' | '+stirrupKg.toFixed(1)+' kg</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL: '+totalKg.toFixed(1)+' kg</h4>';
+var bottomBars12m=Math.ceil(bottomTotal/12);
+var topBars12m=Math.ceil(topTotal/12);
+var stirrupBars12m=Math.ceil(stirrupTotal/12);
+html+='<h4 style="color:#30d158">12m BARS NEEDED:</h4>';
+html+='<p style="font-size:11px"><b>'+bottomBars12m+' x 12m '+bottomBar+'</b> (Bottom: '+bottomCount+' x '+bottomLen.toFixed(0)+'mm)</p>';
+html+='<p style="font-size:11px"><b>'+topBars12m+' x 12m '+topBar+'</b> (Top: '+topCount+' x '+topLen.toFixed(0)+'mm)</p>';
+html+='<p style="font-size:11px"><b>'+stirrupBars12m+' x 12m '+stirrup+'</b> (Stirrups: '+stirrupCount+' x '+stirrupPerimeter+'mm)</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL: '+bottomBars12m+' x '+bottomBar+' + '+topBars12m+' x '+topBar+' + '+stirrupBars12m+' x '+stirrup+'</h4>';
+html+='<p style="font-size:10px;color:#aaa">Inspection: Bottom '+bottomCount+'x'+bottomBar+', Top '+topCount+'x'+topBar+', '+stirrup+' @ '+spacing+'mm</p>';
+html+='<button class="btn btn-sm btn-green" onclick="saveStructureAnalysis(\''+ref+'\',\'Beam\','+totalKg.toFixed(1)+')">Save</button></div>';
+document.getElementById("_bmResult").innerHTML=html;
+}
+function showStairAnalyzer(){
+var h='<h3>Staircase Reinforcement Analyzer</h3>';
+h+='<div class="card"><label>Stair Ref:</label><input id="_stRef" placeholder="e.g. ST1"><label>Stair Type:</label><select id="_stType"><option>Straight Flight</option><option>Dog-Leg</option><option>Open-Well</option><option>Spiral/Circular</option><option>Cantilever</option><option>Winder</option></select><div class="row"><div><label>Flight Width (mm):</label><input id="_stWidth" type="number" value="1200"></div><div><label>Waist Thickness (mm):</label><input id="_stWaist" type="number" value="150"></div></div><div class="row"><div><label>Number of Risers:</label><input id="_stRisers" type="number" value="15"></div><div><label>Riser Height (mm):</label><input id="_stRiserH" type="number" value="150"></div></div><div class="row"><div><label>Going/Tread (mm):</label><input id="_stGoing" type="number" value="300"></div><div><label>Main Bar Size:</label><select id="_stMainBar"><option>Y10</option><option>Y12</option><option>Y16</option></select></div></div><label>Main Bar Spacing (mm):</label><input id="_stMainSpacing" type="number" value="200"><div class="row"><div><label>Distribution Bar:</label><select id="_stDistBar"><option>Y10</option><option>Y12</option></select></div><div><label>Dist Bar Spacing (mm):</label><input id="_stDistSpacing" type="number" value="250"></div></div><label>Cover (mm):</label><input id="_stCover" type="number" value="20"><button class="btn" onclick="analyzeStair()">Analyze</button></div>';
+h+='<div id="_stResult"></div>';
+document.getElementById("content").innerHTML=h;
+}
+function analyzeStair(){
+var stairType=document.getElementById("_stType").value;
+var ref=document.getElementById("_stRef").value||"ST";
+var width=parseFloat(document.getElementById("_stWidth").value)||1200;
+var waist=parseFloat(document.getElementById("_stWaist").value)||150;
+var risers=parseInt(document.getElementById("_stRisers").value)||15;
+var riserH=parseFloat(document.getElementById("_stRiserH").value)||150;
+var going=parseFloat(document.getElementById("_stGoing").value)||300;
+var mainBar=document.getElementById("_stMainBar").value;
+var mainSpacing=parseFloat(document.getElementById("_stMainSpacing").value)||200;
+var distBar=document.getElementById("_stDistBar").value;
+var distSpacing=parseFloat(document.getElementById("_stDistSpacing").value)||250;
+var cover=parseFloat(document.getElementById("_stCover").value)||20;
+var barWt={"Y10":0.617,"Y12":0.888,"Y16":1.579};
+var mainWt=barWt[mainBar]||0.888;
+var distWt=barWt[distBar]||0.617;
+var totalRise=risers*riserH;
+var flightMultiplier=1;
+if(stairType==="Dog-Leg"){flightMultiplier=2;}
+if(stairType==="Open-Well"){flightMultiplier=2;}
+if(stairType==="Winder"){flightMultiplier=1.5;}
+if(stairType==="Cantilever"){flightMultiplier=1;}
+if(stairType==="Spiral/Circular"){flightMultiplier=2.5;}
+var totalGoing=risers*going;
+var slopeLen=Math.sqrt(totalRise*totalRise+totalGoing*totalGoing)*flightMultiplier;
+var mainBarLen=slopeLen+((width+waist)*2)*0.001+200;
+var mainBarCount=Math.ceil(width/mainSpacing)+1;
+var mainTotal=mainBarCount*mainBarLen/1000;
+var mainKg=mainTotal*mainWt;
+var distBarLen=width-2*cover+150;
+var distBarCount=Math.ceil(slopeLen/distSpacing)+1;
+var distTotal=distBarCount*distBarLen/1000;
+var distKg=distTotal*distWt;
+var totalKg=mainKg+distKg;
+var mainBars12m=Math.ceil(mainTotal/12);
+var distBars12m=Math.ceil(distTotal/12);
+var topBars12m=isSuspended?Math.ceil(topTotal/12):0;
+var html='<div class="card" style="background:#1a1a2e;margin-top:10px"><h4>Stair '+ref+' Analysis</h4>';
+html+='<p>Type: '+stairType+' | Total Rise: '+totalRise+'mm ('+risers+' risers @ '+riserH+'mm)</p>';
+html+='<p>Total Going: '+totalGoing+'mm ('+risers+' treads @ '+going+'mm)</p>';
+html+='<p>Slope Length: '+slopeLen.toFixed(0)+'mm</p>';
+html+='<p>Main Bars: '+mainBarCount+' x '+mainBar+' @ '+mainBarLen.toFixed(0)+'mm = '+mainKg.toFixed(1)+' kg</p>';
+html+='<p>Distribution Bars: '+distBarCount+' x '+distBar+' @ '+distBarLen.toFixed(0)+'mm = '+distKg.toFixed(1)+' kg</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL STEEL: '+totalKg.toFixed(1)+' kg</h4>';
+html+='<h4 style="color:#30d158">12m BARS NEEDED:</h4>';
+html+='<p style="font-size:11px"><b>'+mainBars12m+' x 12m '+mainBar+'</b> (Main bars: '+mainBarCount+' x '+mainBarLen.toFixed(0)+'mm)</p>';
+html+='<p style="font-size:11px"><b>'+distBars12m+' x 12m '+distBar+'</b> (Dist bars: '+distBarCount+' x '+distBarLen.toFixed(0)+'mm)</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL: '+mainBars12m+' x '+mainBar+' + '+distBars12m+' x '+distBar+(isSuspended?' + '+topBars12m+' x '+mainBar+' (top)':'')+'</h4>';
+html+='<p style="font-size:10px;color:#aaa">Inspection: Main '+mainBar+' @ '+mainSpacing+'mm, Dist '+distBar+' @ '+distSpacing+'mm, cover '+cover+'mm, waist '+waist+'mm</p>';
+html+='<button class="btn btn-sm btn-green" onclick="saveStructureAnalysis(\''+ref+'\',\'Stair\','+totalKg.toFixed(1)+')">Save</button></div>';
+document.getElementById("_stResult").innerHTML=html;
+}
+function showSlabAnalyzer(){
+var h='<h3>Slab Reinforcement Analyzer</h3>';
+h+='<div class="card"><label>Slab Ref:</label><input id="_slRef" placeholder="e.g. S1, GF Slab"><label>Slab Type:</label><select id="_slType"><option>Ground Floor Slab</option><option>Suspended Slab</option><option>Roof Slab</option><option>Ribbed Slab</option><option>Waffle Slab</option><option>Flat Slab</option><option>Post-Tensioned</option></select><div class="row"><div><label>Length (mm):</label><input id="_slL" type="number" value="6000"></div><div><label>Width (mm):</label><input id="_slW" type="number" value="4000"></div></div><div class="row"><div><label>Thickness (mm):</label><input id="_slT" type="number" value="150"></div><div><label>Main Bar Size:</label><select id="_slMainBar"><option>Y10</option><option>Y12</option><option>Y16</option></select></div></div><label>Main Bar Spacing (mm):</label><input id="_slMainSpacing" type="number" value="200"><div class="row"><div><label>Distribution Bar:</label><select id="_slDistBar"><option>Y10</option><option>Y12</option></select></div><div><label>Dist Bar Spacing (mm):</label><input id="_slDistSpacing" type="number" value="250"></div></div><label>Cover (mm):</label><input id="_slCover" type="number" value="25"><div class="row"><div><label>Number of same slabs:</label><input id="_slCount" type="number" value="1"></div><div><label>BRC Mesh?</label><select id="_slMesh"><option>No - Use Bars</option><option>A142</option><option>A193</option><option>A252</option><option>A393</option></select></div></div><button class="btn" onclick="analyzeSlab()">Analyze</button></div>';
+h+='<div id="_slResult"></div>';
+document.getElementById("content").innerHTML=h;
+}
+function analyzeSlab(){
+var ref=document.getElementById("_slRef").value||"S";
+var type=document.getElementById("_slType").value;
+var L=parseFloat(document.getElementById("_slL").value)||6000;
+var W=parseFloat(document.getElementById("_slW").value)||4000;
+var T=parseFloat(document.getElementById("_slT").value)||150;
+var mainBar=document.getElementById("_slMainBar").value;
+var mainSpacing=parseFloat(document.getElementById("_slMainSpacing").value)||200;
+var distBar=document.getElementById("_slDistBar").value;
+var distSpacing=parseFloat(document.getElementById("_slDistSpacing").value)||250;
+var cover=parseFloat(document.getElementById("_slCover").value)||25;
+var count=parseInt(document.getElementById("_slCount").value)||1;
+var mesh=document.getElementById("_slMesh").value;
+var barWt={"Y10":0.617,"Y12":0.888,"Y16":1.579};
+var meshWt={"A142":2.22,"A193":3.02,"A252":3.95,"A393":6.16};
+var mainWt=barWt[mainBar]||0.888;
+var distWt=barWt[distBar]||0.617;
+var html='<div class="card" style="background:#1a1a2e;margin-top:10px"><h4>Slab '+ref+' Analysis</h4>';
+html+='<p>Type: '+type+' | Size: '+L+'x'+W+'mm | Thickness: '+T+'mm</p>';
+if(mesh!=="No - Use Bars"){
+var meshKg=L*W*meshWt[mesh]/1000000;
+html+='<h4 style="color:#30d158">BRC Mesh '+mesh+': '+meshKg.toFixed(1)+' kg</h4>';
+var slabArea=(L/1000)*(W/1000);var meshSheets=Math.ceil(slabArea/(2.4*4.8)*1.1);var rollArea=2.1*48;var meshRolls=Math.ceil((slabArea*1.1)/rollArea);
+html+='<p>Mesh area needed: '+(slabArea*1.1).toFixed(1)+'m2 (incl 10% wastage)</p>';html+='<p><b>Roll option (2.1m x 48m = 100.8m2): '+meshRolls+' roll(s)</b></p>';html+='<p>Sheet option (2.4x4.8m): '+meshSheets+' sheets</p>';
+html+='<button class="btn btn-sm btn-green" onclick="saveStructureAnalysis(\''+ref+'\',\'Slab ('+mesh+')\','+meshKg.toFixed(1)+')">Save</button></div>';
+}else{
+var isSuspended=(type==="Suspended Slab"||type==="Roof Slab"||type==="Ribbed Slab"||type==="Flat Slab"||type==="Post-Tensioned");
+var bentUpExtra=isSuspended?1000:0;
+var mainLen=L-2*cover+150+bentUpExtra;
+var mainCount=Math.ceil(W/mainSpacing)+1;
+var mainTotal=mainCount*mainLen/1000;
+var mainKg=mainTotal*mainWt;
+var topBarLen=isSuspended?((L/4)+((W+400)*2)*0.001+200):0;
+var topBarCount=isSuspended?Math.ceil(W/mainSpacing)+1:0;
+var topTotal=topBarCount*topBarLen/1000;
+var topKg=topTotal*mainWt;
+var chairsCount=isSuspended?Math.ceil((L*W)/(1000*1000)):0;
+var distLen=W-2*cover+150;
+var distCount=Math.ceil(L/distSpacing)+1;
+var distTotal=distCount*distLen/1000;
+var distKg=distTotal*distWt;
+var totalKg=(mainKg+distKg+topKg+chairsCount*0.617)*count;
+var mainBars12m=Math.ceil(mainTotal/12);
+var distBars12m=Math.ceil(distTotal/12);
+var topBars12m=isSuspended?Math.ceil(topTotal/12):0;
+html+='<p>Main Bars: '+mainCount+' x '+mainBar+' @ '+mainLen.toFixed(0)+'mm = '+mainKg.toFixed(1)+' kg</p>';
+html+='<p>Distribution Bars: '+distCount+' x '+distBar+' @ '+distLen.toFixed(0)+'mm = '+distKg.toFixed(1)+' kg</p>';
+if(isSuspended){html+='<p>Top Bars (Sheers): '+topBarCount+' x '+mainBar+' @ '+topBarLen.toFixed(0)+'mm = '+topKg.toFixed(1)+' kg</p>';html+='<p>Chairs: '+chairsCount+' chairs (Y10 @ 1m2) = '+(chairsCount*0.617).toFixed(1)+' kg</p>';}
+if(count>1){html+='<p>For '+count+' slabs: '+totalKg.toFixed(1)+' kg</p>';}
+html+='<h4 style="color:#ff9f0a">TOTAL STEEL: '+totalKg.toFixed(1)+' kg</h4>';
+html+='<h4 style="color:#30d158">12m BARS NEEDED:</h4>';
+html+='<p style="font-size:11px"><b>'+mainBars12m+' x 12m '+mainBar+'</b> (Main: '+mainCount+' x '+mainLen.toFixed(0)+'mm)</p>';
+html+='<p style="font-size:11px"><b>'+distBars12m+' x 12m '+distBar+'</b> (Dist: '+distCount+' x '+distLen.toFixed(0)+'mm)</p>';
+html+='<h4 style="color:#ff9f0a">TOTAL: '+mainBars12m+' x '+mainBar+' + '+distBars12m+' x '+distBar+(isSuspended?' + '+topBars12m+' x '+mainBar+' (top)':'')+'</h4>';
+html+='<p style="font-size:10px;color:#aaa">Inspection: Main '+mainBar+' @ '+mainSpacing+'mm'+(isSuspended?' (with 1m bent-up at supports)':'')+', Dist '+distBar+' @ '+distSpacing+'mm, cover '+cover+'mm, thickness '+T+'mm</p>';
+html+='<button class="btn btn-sm btn-green" onclick="saveStructureAnalysis(\''+ref+'\',\'Slab\','+totalKg.toFixed(1)+')">Save</button></div>';
+}
+document.getElementById("_slResult").innerHTML=html;
+}
+function saveStructureAnalysis(ref,type,totalKg){
+if(!D.structureAnalysis)D.structureAnalysis=[];
+D.structureAnalysis.push({id:uid(),ref:ref,type:type,totalKg:totalKg,date:globalDate,timestamp:Date.now()});
+save();toast("Saved!");
 }
 function saveDrawing(){
 if(!D.drawings)D.drawings=[];
