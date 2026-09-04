@@ -489,7 +489,7 @@ var sandUsed=volDone*parseFloat(mx.sand)||0;
 var ballastUsed=volDone*parseFloat(mx.ballast)||0;
 var waterUsed=volDone*parseFloat(mx.water)||0;
 var r=document.getElementById("_muResult");
-if(r)r.innerHTML='<b style="color:#ff9f0a">Concrete Done: '+volDone.toFixed(3)+' m3</b><br>Cement: <b>'+bags+' bags</b> ('+(bags*50)+' kg)<br>Sand Used: <b>'+sandUsed.toFixed(2)+' m3</b><br>Ballast Used: <b>'+ballastUsed.toFixed(2)+' m3</b><br>Water Used: <b>~'+Math.round(waterUsed)+' litres</b>';
+if(r)r.innerHTML='<b style="color:#ff9f0a">Concrete Done: '+volDone.toFixed(3)+' m3</b><br>Cement: <b>'+bags+' bags</b> ('+(bags*50)+' kg)<br>Sand Used: <b>'+sandUsed.toFixed(2)+' m3</b> (~'+(sandUsed*1.6).toFixed(2)+' tonnes)<br>Ballast Used: <b>'+ballastUsed.toFixed(2)+' m3</b> (~'+(ballastUsed*1.75).toFixed(2)+' tonnes)<br>Water Used: <b>~'+Math.round(waterUsed)+' litres</b>';
 }
 function saveMatUsage(){
 var grade=document.getElementById("_muGrade").value;
@@ -502,11 +502,11 @@ var waterUsed=Math.round(volDone*parseFloat(mx.water)||0);
 var d=document.getElementById("_entryDate").value;
 if(!D.materialLogs)D.materialLogs=[];
 addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Cement & Binders",name:document.getElementById("_muCementType").value||"Cement - OPC 42.5N (Bamburi)",qty:bags,unit:"Bags",location:"Concrete works"});
-addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Aggregates & Sand",name:"River Sand (Fine) - per ton",qty:sandUsed,unit:"m3",location:"Concrete works"});
-addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Aggregates & Sand",name:"Ballast 20mm - per ton",qty:ballastUsed,unit:"m3",location:"Concrete works"});
+addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Aggregates & Sand",name:"River Sand (Fine) - per ton",qty:(sandUsed*1.6).toFixed(2),unit:"Tonnes",location:"Concrete works"});
+addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Aggregates & Sand",name:"Ballast 20mm - per ton",qty:(ballastUsed*1.75).toFixed(2),unit:"Tonnes",location:"Concrete works"});
 addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Water",name:"Water - Tractor Bowser 5000L",qty:waterUsed,unit:"Liters",location:"Concrete works"});
 if(!D.stock)D.stock=[];
-var items=[{name:document.getElementById("_muCementType").value||"Cement - OPC 42.5N (Bamburi)",qty:bags},{name:"River Sand (Fine) - per ton",qty:parseFloat(sandUsed)},{name:"Ballast 20mm - per ton",qty:parseFloat(ballastUsed)},{name:"Water - Tractor Bowser 5000L",qty:waterUsed}];
+var items=[{name:document.getElementById("_muCementType").value||"Cement - OPC 42.5N (Bamburi)",qty:bags},{name:"River Sand (Fine) - per ton",qty:parseFloat((sandUsed*1.6).toFixed(2))},{name:"Ballast 20mm - per ton",qty:parseFloat((ballastUsed*1.75).toFixed(2))},{name:"Water - Tractor Bowser 5000L",qty:waterUsed}];
 for(var i=0;i<items.length;i++){for(var j=0;j<D.stock.length;j++){if(D.stock[j].name===items[i].name){D.stock[j].qty-=items[i].qty;break;}}}
 save();toast("Material usage saved + stock deducted!");go("materials");
 }
