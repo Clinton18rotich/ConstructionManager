@@ -423,7 +423,7 @@ document.getElementById("content").innerHTML=h;loadMatItems();
 }
 function showUsageForm(){
 var cats="";var ckeys=Object.keys(MATERIAL_CATALOG);for(var i=0;i<ckeys.length;i++){cats+='<option>'+ckeys[i]+'</option>';}
-var h='<h3>Log Material Usage</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_mcat" onchange="loadMatItems()">'+cats+'</select><label>Material:</label><select id="_mitem"></select><div class="row"><div><label>Quantity Used:</label><input id="_mqty" type="number"></div><div><label>Unit:</label><select id="_munit"><option>Bags</option><option>kg</option><option>Tonnes</option><option>m3</option><option>Pieces</option><option>Bundles</option><option>Liters</option><option>Rolls</option><option>Lengths</option><option>Sheets</option></select></div></div><label>Location Used:</label><input id="_msrc" placeholder="e.g. Block A - GF"><button class="btn btn-red" onclick="saveUsage()">Save Usage</button><button class="btn btn-secondary" onclick="go(\'materials\')">Cancel</button>';
+var h='<h3>Log Material Usage</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_mcat" onchange="loadMatItems()">'+cats+'</select><label>Material:</label><select id="_mitem" onchange="checkCementUsage()"></select><div class="row"><div><label>Quantity Used:</label><input id="_mqty" type="number"></div><div><label>Unit:</label><select id="_munit"><option>Bags</option><option>kg</option><option>Tonnes</option><option>m3</option><option>Pieces</option><option>Bundles</option><option>Liters</option><option>Rolls</option><option>Lengths</option><option>Sheets</option></select></div></div><label>Location Used:</label><input id="_msrc" placeholder="e.g. Block A - GF"><button class="btn btn-red" onclick="saveUsage()">Save Usage</button><button class="btn btn-secondary" onclick="go(\'materials\')">Cancel</button>';
 document.getElementById("content").innerHTML=h;loadMatItems();
 }
 function loadMatItems(){var cat=document.getElementById("_mcat").value;var items=MATERIAL_CATALOG[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_mitem").innerHTML=h;}
@@ -523,6 +523,7 @@ var items=[{name:document.getElementById("_muCementType").value||"Cement - OPC 4
 for(var i=0;i<items.length;i++){for(var j=0;j<D.stock.length;j++){if(D.stock[j].name===items[i].name){D.stock[j].qty-=items[i].qty;break;}}}
 save();toast("Material usage saved + stock deducted!");go("materials");
 }
+function checkCementUsage(){var mat=document.getElementById("_mitem").value;if(mat.indexOf("Cement")!==-1){toast("Cement selected - use calculator");showMatUsageCalc();}}
 function calcMix(){
 var l=parseFloat((document.getElementById("_cpL")||{}).value)||0;
 var w=parseFloat((document.getElementById("_cpW")||{}).value)||0;
