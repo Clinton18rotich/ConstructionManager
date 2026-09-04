@@ -15,7 +15,19 @@ android {
         versionName = "1.0"
     }
     
+    signingConfigs {
+        create("customDebug") {
+            storeFile = file("/data/data/com.termux/files/home/debug.keystore")
+            storePassword = "android"
+            keyAlias = "debug"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("customDebug")
+        }
         release {
             isMinifyEnabled = false
         }
