@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.cm.app"
+    namespace = "com.cm.app2"
     compileSdk = 34
     
     defaultConfig {
-        applicationId = "com.cm.app"
+        applicationId = "com.cm.app2"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

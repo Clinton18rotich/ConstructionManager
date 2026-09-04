@@ -1,4 +1,4 @@
-package com.cm.app
+package com.cm.app2
 
 import android.content.Intent
 import android.net.Uri
