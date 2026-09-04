@@ -414,23 +414,8 @@ else{
 if(deliv.length>0){list+='<h4 style="color:#30d158">Deliveries</h4>';for(var i=0;i<deliv.length;i++){var e=deliv[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.name+' (IN)</h4><button class="btn btn-red btn-sm" onclick="delItem(\'materialLogs\',\''+e.id+'\');go(\'materials\')">X</button></div><p>Qty: '+e.qty+' '+e.unit+' | Source: '+e.source+'</p></div>';}}
 if(used.length>0){list+='<h4 style="color:#ff3b30;margin-top:10px">Used Today</h4>';for(var i=0;i<used.length;i++){var e=used[i];list+='<div class="card"><div style="display:flex;justify-content:space-between"><h4>'+e.name+' (USED)</h4><button class="btn btn-red btn-sm" onclick="delItem(\'materialLogs\',\''+e.id+'\');go(\'materials\')">X</button></div><p>Qty: '+e.qty+' '+e.unit+' | Location: '+e.location+'</p></div>';}}
 }
-return '<h2>Materials</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<div style="display:flex;gap:8px"><button class="btn btn-green" onclick="showDeliveryForm()">+ Delivery</button><button class="btn btn-red" onclick="showUsageForm()">+ Usage</button></div>';
+return '<h2>Materials</h2><p style="color:#aaa;font-size:12px">Date: '+globalDate+'</p>'+list+'<div style="display:flex;gap:8px"><button class="btn btn-green" onclick="showDeliveryForm()">+ Delivery</button><button class="btn btn-red" onclick="showUsageForm()">+ Usage</button><button class="btn btn-green" style="background:#FF9500;color:#000" onclick="showMatUsageCalc()">Materials Used Calculator</button></div>';
 };
-function showDeliveryForm(){
-var cats="";var ckeys=Object.keys(MATERIAL_CATALOG);for(var i=0;i<ckeys.length;i++){cats+='<option>'+ckeys[i]+'</option>';}
-var h='<h3>Log Material Delivery</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_mcat" onchange="loadMatItems()">'+cats+'</select><label>Material:</label><select id="_mitem"></select><div class="row"><div><label>Quantity:</label><input id="_mqty" type="number"></div><div><label>Unit:</label><select id="_munit"><option>Bags</option><option>kg</option><option>Tonnes</option><option>m3</option><option>Pieces</option><option>Bundles</option><option>Liters</option><option>Rolls</option><option>Lengths</option><option>Sheets</option></select></div></div><label>Source/Supplier:</label><input id="_msrc"><button class="btn btn-green" onclick="saveDelivery()">Save Delivery</button><button class="btn btn-secondary" onclick="go(\'materials\')">Cancel</button>';
-document.getElementById("content").innerHTML=h;loadMatItems();
-}
-function showUsageForm(){
-var cats="";var ckeys=Object.keys(MATERIAL_CATALOG);for(var i=0;i<ckeys.length;i++){cats+='<option>'+ckeys[i]+'</option>';}
-var h='<h3>Log Material Usage</h3><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Category:</label><select id="_mcat" onchange="loadMatItems()">'+cats+'</select><label>Material:</label><select id="_mitem"></select><div class="row"><div><label>Quantity Used:</label><input id="_mqty" type="number"></div><div><label>Unit:</label><select id="_munit"><option>Bags</option><option>kg</option><option>Tonnes</option><option>m3</option><option>Pieces</option><option>Bundles</option><option>Liters</option><option>Rolls</option><option>Lengths</option><option>Sheets</option></select></div></div><label>Location Used:</label><input id="_msrc" placeholder="e.g. Block A - GF"><button class="btn btn-red" onclick="saveUsage()">Save Usage</button><button class="btn btn-secondary" onclick="go(\'materials\')">Cancel</button>';
-document.getElementById("content").innerHTML=h;loadMatItems();
-}
-function loadMatItems(){var cat=document.getElementById("_mcat").value;var items=MATERIAL_CATALOG[cat]||[];var h="";for(var i=0;i<items.length;i++){h+='<option>'+items[i]+'</option>';}document.getElementById("_mitem").innerHTML=h;}
-function saveDelivery(){addItem("materialLogs",{id:uid(),type:"delivery",date:document.getElementById("_entryDate").value,category:document.getElementById("_mcat").value,name:document.getElementById("_mitem").value,qty:document.getElementById("_mqty").value,unit:document.getElementById("_munit").value,source:document.getElementById("_msrc").value});var en=document.getElementById("_mitem").value;var eq=parseFloat(document.getElementById("_mqty").value)||0;var eu=document.getElementById("_munit").value;var ed=document.getElementById("_entryDate").value;var ec=document.getElementById("_mcat").value;if(!D.stock)D.stock=[];var found=false;for(var i=0;i<D.stock.length;i++){if(D.stock[i].name===en){D.stock[i].qty+=eq;D.stock[i].unit=eu;found=true;break;}}if(!found){D.stock.push({id:uid(),name:en,category:ec,qty:eq,unit:eu,minStock:10,date:ed});}save();toast("Delivery logged!");go("materials");}
-function saveUsage(){addItem("materialLogs",{id:uid(),type:"usage",date:document.getElementById("_entryDate").value,category:document.getElementById("_mcat").value,name:document.getElementById("_mitem").value,qty:document.getElementById("_mqty").value,unit:document.getElementById("_munit").value,location:document.getElementById("_msrc").value});var en=document.getElementById("_mitem").value;var eq=parseFloat(document.getElementById("_mqty").value)||0;var eu=document.getElementById("_munit").value;if(!D.stock)D.stock=[];var found=false;for(var i=0;i<D.stock.length;i++){if(D.stock[i].name===en){D.stock[i].qty-=eq;found=true;if(D.stock[i].qty<0){toast("Warning: Stock negative for "+en);}break;}}if(!found){toast(en+" not in stock - usage logged only");}save();toast("Usage logged!");go("materials");}
-
-// CONCRETE MIX DESIGN
 RENDER["stock"]=function(){
 var list="";var stock=D.stock||[];
 var toolCats=["Tools & Site Equipment"];var low=stock.filter(function(e){return e.qty<=e.minStock&&toolCats.indexOf(e.category)===-1;});
@@ -488,6 +473,43 @@ document.getElementById("content").innerHTML=h;var gs=document.getElementById("_
 }
 
 function checkIfSlab(){var sel=document.getElementById("_cpCat").value;var beamDiv=document.getElementById("_beamDiv");if(beamDiv){if(sel==="Slab"||sel==="Road"){beamDiv.style.display="block";}else{beamDiv.style.display="none";document.getElementById("_bmCount").value=0;}calcMix();}}
+function showMatUsageCalc(){
+var grades="";var gk=Object.keys(CONCRETE_MIXES);for(var i=0;i<gk.length;i++){grades+='<option value="'+gk[i]+'">'+gk[i]+'</option>';}
+var h='<h3>Calculate Materials Used</h3><p style="color:#aaa;font-size:12px">From cement used and mix ratio</p>';
+h+='<div class="card"><label>Date:</label><input type="date" id="_entryDate" value="'+globalDate+'" max="'+today()+'"><label>Concrete Grade:</label><select id="_muGrade" onchange="calcMatUsage()">'+grades+'</select><label>Cement Type:</label><select id="_muCementType"></select><label>Cement Used (bags):</label><input id="_muCement" type="number" value="10" onchange="calcMatUsage()"><div id="_muResult" style="margin:10px 0;padding:10px;background:#111;border-radius:8px"></div><button class="btn btn-green" onclick="saveMatUsage()">Save to Material Usage</button><button class="btn btn-secondary" onclick="go(\'materials\')">Cancel</button></div>';
+document.getElementById("content").innerHTML=h;var ct=document.getElementById("_muCementType");if(ct){var cements=MATERIAL_CATALOG["Cement & Binders"]||[];var ch="";for(var i=0;i<cements.length;i++){if(cements[i].indexOf("Cement")!==-1)ch+='<option>'+cements[i]+'</option>';}ct.innerHTML=ch;}calcMatUsage();
+}
+function calcMatUsage(){
+var grade=document.getElementById("_muGrade").value;
+var bags=parseFloat(document.getElementById("_muCement").value)||0;
+var mx=CONCRETE_MIXES[grade]||{cement:"0",sand:"0",ballast:"0",water:"0"};
+var cemPerM3=parseFloat((mx.cement||"0").match(/\d+/))||0;
+var volDone=cemPerM3>0?(bags*50)/cemPerM3:0;
+var sandUsed=volDone*parseFloat(mx.sand)||0;
+var ballastUsed=volDone*parseFloat(mx.ballast)||0;
+var waterUsed=volDone*parseFloat(mx.water)||0;
+var r=document.getElementById("_muResult");
+if(r)r.innerHTML='<b style="color:#ff9f0a">Concrete Done: '+volDone.toFixed(3)+' m3</b><br>Cement: <b>'+bags+' bags</b> ('+(bags*50)+' kg)<br>Sand Used: <b>'+sandUsed.toFixed(2)+' m3</b><br>Ballast Used: <b>'+ballastUsed.toFixed(2)+' m3</b><br>Water Used: <b>~'+Math.round(waterUsed)+' litres</b>';
+}
+function saveMatUsage(){
+var grade=document.getElementById("_muGrade").value;
+var bags=parseFloat(document.getElementById("_muCement").value)||0;
+var mx=CONCRETE_MIXES[grade]||{};var cemPerM3=parseFloat((mx.cement||"0").match(/\d+/))||0;
+var volDone=cemPerM3>0?(bags*50)/cemPerM3:0;
+var sandUsed=(volDone*parseFloat(mx.sand)||0).toFixed(2);
+var ballastUsed=(volDone*parseFloat(mx.ballast)||0).toFixed(2);
+var waterUsed=Math.round(volDone*parseFloat(mx.water)||0);
+var d=document.getElementById("_entryDate").value;
+if(!D.materialLogs)D.materialLogs=[];
+addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Cement & Binders",name:document.getElementById("_muCementType").value||"Cement - OPC 42.5N (Bamburi)",qty:bags,unit:"Bags",location:"Concrete works"});
+addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Aggregates & Sand",name:"River Sand (Fine) - per ton",qty:sandUsed,unit:"m3",location:"Concrete works"});
+addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Aggregates & Sand",name:"Ballast 20mm - per ton",qty:ballastUsed,unit:"m3",location:"Concrete works"});
+addItem("materialLogs",{id:uid(),type:"usage",date:d,category:"Water",name:"Water - Tractor Bowser 5000L",qty:waterUsed,unit:"Liters",location:"Concrete works"});
+if(!D.stock)D.stock=[];
+var items=[{name:document.getElementById("_muCementType").value||"Cement - OPC 42.5N (Bamburi)",qty:bags},{name:"River Sand (Fine) - per ton",qty:parseFloat(sandUsed)},{name:"Ballast 20mm - per ton",qty:parseFloat(ballastUsed)},{name:"Water - Tractor Bowser 5000L",qty:waterUsed}];
+for(var i=0;i<items.length;i++){for(var j=0;j<D.stock.length;j++){if(D.stock[j].name===items[i].name){D.stock[j].qty-=items[i].qty;break;}}}
+save();toast("Material usage saved + stock deducted!");go("materials");
+}
 function calcMix(){
 var l=parseFloat((document.getElementById("_cpL")||{}).value)||0;
 var w=parseFloat((document.getElementById("_cpW")||{}).value)||0;
